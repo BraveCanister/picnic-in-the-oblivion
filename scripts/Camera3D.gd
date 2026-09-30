@@ -705,6 +705,12 @@ func ChangeRotationCutScene(rot : Vector3):
 	PlayerCamera.rotation.z = rot.z
 	
 func _ready():
+	# Avoid the Android camera-feed startup path while preserving the game environment.
+	if OS.has_feature("android"):
+		var camera_environment : Environment = PlayerCamera.environment
+		if camera_environment != null and camera_environment.background_mode == Environment.BG_CAMERA_FEED:
+			camera_environment.background_mode = Environment.BG_COLOR
+
 	#await get_tree().create_timer(0.2).timeout
 	if not GameManager.pause:
 		Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
