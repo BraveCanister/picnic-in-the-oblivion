@@ -94,14 +94,31 @@ signal on_gui_init_finished
 
 # Called when the node enters the scene tree for the first time.
 func _ready():
-	var dynamic_font_regular = FontFile.new()
-	var dynamic_font_bold = FontFile.new()
+	var dynamic_font_regular : FontFile
+	var dynamic_font_bold : FontFile
 	
 	var regular_font : Theme = load("res://themes/regular_font.tres") as Theme
 	var bold_font : Theme = load("res://themes/bold_font.tres") as Theme
 	
-	dynamic_font_regular.load_dynamic_font(GameManager.app_dir+"assets/fonts/SM3DRegular.ttf")
-	dynamic_font_bold.load_dynamic_font(GameManager.app_dir+"assets/fonts/SM3DBold.ttf")
+	if OS.has_feature("android"):
+		var packaged_fonts : Array[FontFile] = []
+		for path in ["res://assets/fonts/SM3DRegular.ttf", "res://assets/fonts/SM3DBold.ttf"]:
+			var packaged_font = ResourceLoader.load(path, "FontFile") as FontFile
+			if packaged_font == null or packaged_font.data.is_empty() or not packaged_font.has_char(65):
+				push_error("[GUI Fonts]: Missing or unusable packaged FontFile: " + path)
+				return
+			var runtime_font = packaged_font.duplicate() as FontFile
+			if runtime_font == null:
+				push_error("[GUI Fonts]: Failed to duplicate packaged FontFile: " + path)
+				return
+			packaged_fonts.append(runtime_font)
+		dynamic_font_regular = packaged_fonts[0]
+		dynamic_font_bold = packaged_fonts[1]
+	else:
+		dynamic_font_regular = FontFile.new()
+		dynamic_font_bold = FontFile.new()
+		dynamic_font_regular.load_dynamic_font(GameManager.app_dir+"assets/fonts/SM3DRegular.ttf")
+		dynamic_font_bold.load_dynamic_font(GameManager.app_dir+"assets/fonts/SM3DBold.ttf")
 	
 	dynamic_font_regular.antialiasing = TextServer.FONT_ANTIALIASING_NONE
 	dynamic_font_bold.antialiasing = TextServer.FONT_ANTIALIASING_NONE
@@ -118,6 +135,8 @@ func _ready():
 	bold_font.set_font("font","LineEdit",dynamic_font_bold)
 	bold_font.set_font("bold_font","RichTextLabel",dynamic_font_bold)
 	bold_font.set_font("normal_font","RichTextLabel",dynamic_font_regular)
+	if OS.has_feature("android"):
+		print("[GUI Fonts]: Packaged regular/bold FontFile copies configured and assigned.")
 	#get_tree().root.content_scale_factor = 1.5
 	message_timer.wait_time = message_showtime
 	message_timer.name = "message_queue_timer"
