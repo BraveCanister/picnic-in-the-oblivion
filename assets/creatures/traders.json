@@ -49,7 +49,9 @@
 	  "w_groza",
 	  "ammo_oc",
 	  "w_lr",
-	  "ammo_lr"
+	  "ammo_lr",
+	  "w_vintar",
+	  "ammo_vintar"
 	]
   }
 }

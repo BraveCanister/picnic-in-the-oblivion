@@ -70,5 +70,22 @@
 	"reload_anim": "reload",
 	"speed": 0.13,
 	"shoot_count": 1
+  },
+  "w_vintar": {
+	"clip_ammo_max": 10,
+	"damage": 18.0,
+	"accuracy": 0.45,
+	"fire_sound": "vintar_shot",
+	"hud": "assets/ui/vintar_hud.png",
+	"scope": {
+	  "sprite": "assets/ui/scope.png",
+	  "fov": 40
+	},
+	"sparkle_position": [0.03,-0.02, -0.109],
+	"hud_position": [0.007,0.008, -0.054],
+	"ammo_type": "ammo_vintar",
+	"reload_anim": "reload",
+	"speed": 0.1,
+	"shoot_count": 1
   }
 }

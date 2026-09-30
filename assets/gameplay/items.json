@@ -271,6 +271,16 @@
 		"type": "weapon",
 		"profile": "w_groza"
 	},
+	"w_vintar": {
+		"name": "itm.vintar.name",
+		"caption": "itm.vintar.caption",
+		"icon": "assets/ui/items/w_vintar.png",
+		"price": 4000,
+		"weight": 3.2,
+		"slot": "rifle",
+		"type": "weapon",
+		"profile": "w_vintar"
+	},
 	"ammo_ak": {
 		"name": "itm.ammo.ak.name",
 		"caption": "itm.ammo.ak.caption",
@@ -301,6 +311,14 @@
 		"icon": "assets/ui/items/ammo_oc.png",
 		"price": 100,
 		"weight": 0.3,
+		"type": "item"
+	},
+	"ammo_vintar": {
+		"name": "itm.ammo.vintar.name",
+		"caption": "itm.ammo.vintar.caption",
+		"icon": "assets/ui/items/ammo_vintar.png",
+		"price": 160,
+		"weight": 0.2,
 		"type": "item"
 	},
 	"radio_first": {
