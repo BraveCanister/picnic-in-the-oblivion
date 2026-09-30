@@ -8,7 +8,7 @@ All rights for assets - QPlaze, GSC, Nomoc!
 > [!TIP]
 > DOWNLOAD: [Itch.io](https://alex1197.itch.io/pito)
 
-## Project is using Godot 4.2.1
+## Project is using Godot 4.7.2 stable
 ###  How to start:
 1. Clone this repository
 2. Download [Godot](https://godotengine.org/)
