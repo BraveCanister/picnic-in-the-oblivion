@@ -7,6 +7,20 @@ var js = JSON.new()
 
 # Load Texture2D from extrenal path
 func load_external_texture(path):
+	if OS.has_feature("android") and path.begins_with("assets/ui/") and path.ends_with(".png") and not FileAccess.file_exists(GameManager.app_dir+path):
+		var resource_path = "res://"+path
+		var packaged_texture = ResourceLoader.load(resource_path, "Texture2D") as Texture2D
+		if packaged_texture == null:
+			push_error("[UI Textures]: Missing or invalid packaged Texture2D: " + resource_path)
+			return
+		var packaged_image = packaged_texture.get_image()
+		if packaged_image == null or packaged_image.is_empty() or packaged_image.is_compressed():
+			push_error("[UI Textures]: Packaged texture has no usable uncompressed Image: " + resource_path)
+			return
+		var runtime_image = packaged_image.duplicate() as Image
+		var runtime_texture = ImageTexture.create_from_image(runtime_image)
+		print("[UI Textures]: Loaded packaged PNG: " + resource_path)
+		return runtime_texture
 	if !FileAccess.file_exists(GameManager.app_dir+path):
 		BugTrap.Crash("File "+path+" doesn't exist!","File "+path+" doesn't exist!")
 		return
