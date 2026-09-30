@@ -324,6 +324,10 @@ func ShowTradingMessage(text,type = "classic"):
 		"hint":
 			$GAME/TradingMessage/BG2.hide()
 			$GAME/TradingMessage/BGBlack.hide()
+			if OS.has_feature("android"):
+				# On Android, the original 76 + 98 slices exceed the 145px source region.
+				$GAME/TradingMessage/BG3.patch_margin_left = 36
+				$GAME/TradingMessage/BG3.patch_margin_right = 36
 			$GAME/TradingMessage/BG3.show()
 			TradingMessage.show()
 	$GAME/TradingMessage/infoText.text = text
