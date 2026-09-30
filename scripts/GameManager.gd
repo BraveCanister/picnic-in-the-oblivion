@@ -11,6 +11,8 @@ var _base_mat_emission = preload("res://ingame_materials/pito_3d_emission_mat.tr
 var _sounds_collector = []
 
 var app_dir
+var content_root
+var _startup_content_valid = true
 @onready var Gui : GUI
 @onready var World : Node3D
 @onready var GameProcess : Game
@@ -130,6 +132,7 @@ func _enter_tree():
 		app_dir = OS.get_system_dir(OS.SYSTEM_DIR_DESKTOP)+"/Android/data/com.leksii.pito/files/"
 	else:
 		app_dir = "res://"
+	content_root = "res://" if OS.has_feature("android") else app_dir
 	
 	#await assets_folder_loaded
 	#FileAccess.open("user://test.txt",FileAccess.WRITE)
@@ -142,9 +145,21 @@ func _enter_tree():
 	
 	#print(folders)
 	print("App Dir is: "+app_dir+"\n")
+	print("Content Root is: "+content_root)
 	
 	
-	if !DirAccess.dir_exists_absolute(app_dir+"assets" if OS.has_feature('standalone') else app_dir+"/assets"):
+	if OS.has_feature("android"):
+		var options_path = content_root+"assets/options.json"
+		var app_script_path = content_root+"assets/scripts/p_app.gd"
+		if not FileAccess.file_exists(options_path):
+			_startup_content_valid = false
+			push_error("[Content Loader]: Missing packaged startup JSON: "+options_path)
+			return
+		if not ResourceLoader.exists(app_script_path, "GDScript"):
+			_startup_content_valid = false
+			push_error("[Content Loader]: Missing packaged application hook: "+app_script_path)
+			return
+	elif !DirAccess.dir_exists_absolute(app_dir+"assets" if OS.has_feature('standalone') else app_dir+"/assets"):
 		print("[GAME LOADING ERROR]: THIS IS YOUR PROBLEM!!!")
 		print("[GAME LOADING ERROR]: >>>>> CANNOT FIND ASSETS FOLDER NEAR 'PICNIC.EXE' FILE!!!")
 		print("[GAME LOADING ERROR]: PLEASE, PUT ASSETS FOLDER BACK!!!\n\n\n\n\n\n\n\n")
@@ -153,12 +168,20 @@ func _enter_tree():
 		return
 
 func _ready():
+	if not _startup_content_valid:
+		return
 
 	#if FileAccess.file_exists(app_dir+"logs.txt"):
 		#var logs = FileAccess.open(app_dir+"logs.txt",FileAccess.WRITE)
 		#logs.store_string("Game running!\n------------------------------")
 		#logs.close()
-	GameAPI.RunOutsideScript("p_app").game_init()
+	var app_script = GameAPI.RunOutsideScript("p_app")
+	if app_script == null or not app_script.has_method("game_init"):
+		push_error("[Content Loader]: Application hook cannot dispatch game_init.")
+		return
+	app_script.game_init()
+	if OS.has_feature("android"):
+		print("[Content Loader]: Dispatched p_app.game_init.")
 	
 	GameProcess = get_node("/root/Game") as Game
 	#print(GUI)

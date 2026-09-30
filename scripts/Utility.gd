@@ -95,15 +95,17 @@ func read_json_string(json_data : String):
 
 # read json data from file
 func read_json(json_data):
-	if not FileAccess.file_exists(GameManager.app_dir+json_data):
+	if not FileAccess.file_exists(GameManager.content_root+json_data):
 		BugTrap.Crash("File "+str(json_data)+" doesn't exist!","File "+str(json_data)+" doesn't exist!")
 		return
 		
-	var target = FileAccess.get_file_as_string(GameManager.app_dir+json_data)
+	var target = FileAccess.get_file_as_string(GameManager.content_root+json_data)
 	var parse_result = js.parse(target)
 	if parse_result != OK:
 		BugTrap.Crash("Error %s reading json file." % parse_result,"Error %s reading json file." % parse_result)
 		return
+	if OS.has_feature("android"):
+		print("[Content Loader]: Parsed JSON: "+GameManager.content_root+json_data)
 	return js.data
 
 # Save object data to json

@@ -4,25 +4,32 @@ extends Node
 func RunOutsideScript(script_name : String):
 	# check if game already has holder with this script, if not - load it from file
 	if not has_node(script_name):
-		var script_holder = Node.new()
 		var script = GDScript.new()
-		var file_data = ""
-		
-		if FileAccess.file_exists(GameManager.app_dir+"assets/scripts/%s.gd" % script_name):
-			var file = FileAccess.open(GameManager.app_dir+"assets/scripts/%s.gd" % script_name,FileAccess.READ)
-			file_data = file.get_as_text()
-			file.close()
+		if OS.has_feature("android"):
+			var script_path = GameManager.content_root+"assets/scripts/%s.gd" % script_name
+			if not ResourceLoader.exists(script_path, "GDScript"):
+				push_error("[Script Loader]: Missing packaged hook: "+script_path)
+				return
+			script = ResourceLoader.load(script_path, "GDScript") as GDScript
+			if script == null or not script.can_instantiate() or not ClassDB.is_parent_class(script.get_instance_base_type(), "Node"):
+				push_error("[Script Loader]: Packaged hook is not a usable Node script: "+script_path)
+				return
 		else:
-			print("[Script Loader]: Failed to load script! File is don't exists!\n")
-			return
+			var file_data = ""
+			if FileAccess.file_exists(GameManager.app_dir+"assets/scripts/%s.gd" % script_name):
+				var file = FileAccess.open(GameManager.app_dir+"assets/scripts/%s.gd" % script_name,FileAccess.READ)
+				file_data = file.get_as_text()
+				file.close()
+			else:
+				print("[Script Loader]: Failed to load script! File is don't exists!\n")
+				return
+			if file_data.is_empty():
+				print("[Script Loader]: Failed to load script! Data is empty!\n")
+				return
+			script.source_code = file_data
+			script.reload()
 		
-		if file_data.is_empty(): 
-			print("[Script Loader]: Failed to load script! Data is empty!\n")
-			return
-		
-		script.source_code = file_data
-		script.reload()
-		
+		var script_holder = Node.new()
 		add_child(script_holder)
 		script_holder.name = script_name
 		
