@@ -351,7 +351,8 @@ func game_ready():
 #endregion
 
 func LoadGameLevel(level_id : String, silent : bool = false):
-	if DirAccess.dir_exists_absolute(app_dir+"assets/levels/%s" % level_id):
+	var json_level_exists = FileAccess.file_exists(content_root+"assets/levels/%s/level.json" % level_id) if OS.has_feature("android") else DirAccess.dir_exists_absolute(app_dir+"assets/levels/%s" % level_id)
+	if json_level_exists:
 		change_level(level_id, silent)
 		
 	if FileAccess.file_exists(app_dir+"assets/levels/%s.tscn" % level_id) or \
@@ -1656,7 +1657,8 @@ func load_level(id : String,silent=false):
 	
 	#player.reparent(level_node,false)
 	#waypoints.reparent(level_node,true)
-	if DirAccess.dir_exists_absolute(level_path):
+	var json_level_exists = FileAccess.file_exists(content_root+"assets/levels/"+id+"/level.json") if OS.has_feature("android") else DirAccess.dir_exists_absolute(level_path)
+	if json_level_exists:
 		var level_data = Utility.read_json("assets/levels/"+id+"/level.json")	
 		outsky_color.get_material().albedo_color = Color(level_data["weather_color"])
 		
@@ -1964,6 +1966,8 @@ func load_level(id : String,silent=false):
 	if not silent:
 		emit_signal("on_level_changed",id)	
 	_level_loaded = true
+	if OS.has_feature("android") and json_level_exists:
+		print("[World Content]: Completed JSON level "+id+"; objects="+str(level_node.get_child_count())+"; spawn="+str(player.position)+"; rotation="+str(player.rotation_degrees)+"; HUD shading="+str(player.PlayerCamera.get_node("HUD").material_override.shading_mode))
 	if editor_mode:
 		var label_3d = preload("res://engine_objects/3d_label.tscn")
 		for obj in editor_level_objects:

@@ -7,7 +7,7 @@ var js = JSON.new()
 
 # Load Texture2D from extrenal path
 func load_external_texture(path):
-	if OS.has_feature("android") and path.begins_with("assets/ui/") and path.ends_with(".png") and not FileAccess.file_exists(GameManager.app_dir+path):
+	if OS.has_feature("android") and (path.begins_with("assets/ui/") or path.begins_with("assets/textures/")) and path.ends_with(".png") and not FileAccess.file_exists(GameManager.app_dir+path):
 		var resource_path = "res://"+path
 		var packaged_texture = ResourceLoader.load(resource_path, "Texture2D") as Texture2D
 		if packaged_texture == null:
@@ -55,10 +55,19 @@ func set_texture_to_object(texture,two_sided=false,emission=false):
 	
 # Load *.obj model from file in assets/models/ folder
 func load_model(path, texture="",position=Vector3(0,0,0),rotation=Vector3(0,0,0),scale=Vector3(0,0,0),emission=false,two_sided=false):
-	if !FileAccess.file_exists(GameManager.app_dir+path):
-		BugTrap.Crash("File "+path+" doesn't exist!","File "+path+" doesn't exist!")
-		return
-	var mesh_file = Utility.load_obj(GameManager.app_dir+path)
+	var mesh_file : Mesh
+	if OS.has_feature("android") and (path.begins_with("assets/levels/") or path.begins_with("assets/models/")) and path.ends_with(".obj") and not FileAccess.file_exists(GameManager.app_dir+path):
+		var resource_path = GameManager.content_root+path
+		mesh_file = ResourceLoader.load(resource_path, "Mesh") as Mesh
+		if mesh_file == null or mesh_file.get_surface_count() == 0:
+			push_error("[World Content]: Missing or empty packaged Mesh: "+resource_path)
+			return
+		print("[World Content]: Loaded packaged Mesh: "+resource_path)
+	else:
+		if !FileAccess.file_exists(GameManager.app_dir+path):
+			BugTrap.Crash("File "+path+" doesn't exist!","File "+path+" doesn't exist!")
+			return
+		mesh_file = Utility.load_obj(GameManager.app_dir+path)
 	var mesh = MeshInstance3D.new()
 	var mat = set_texture_to_object(texture,two_sided,emission)
 	
