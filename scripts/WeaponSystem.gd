@@ -71,6 +71,12 @@ func UpdateWeapons():
 	if hide_weapon:
 		GameManager.player.hud.hide()
 		
+func _normal_map_exists(path: String, use_app_dir: bool) -> bool:
+	var external_path = GameManager.app_dir + path if use_app_dir else path
+	if FileAccess.file_exists(external_path):
+		return true
+	return OS.has_feature("android") and ResourceLoader.exists(GameManager.content_root + path, "Texture2D")
+
 func DrawWeapon(slot):
 	if slot == "pistol" and GameManager.Gui.InventoryWindow._GetItemInSlot("pistol"):
 		GameManager.player.hud_anim_player.stop()
@@ -106,8 +112,9 @@ func DrawWeapon(slot):
 		#print(GameManager.player.hud.material_override.albedo_texture.resource_path)
 		var mat = GameManager.player.hud.material_override.duplicate() as StandardMaterial3D
 		mat.albedo_texture = Utility.load_external_texture(current_weapon.data["hud"])
-		if FileAccess.file_exists("assets/ui/"+current_weapon.data["hud"].split('.png')[0].split('ui/')[1]+"_nm.png"):
-			mat.normal_texture = Utility.load_external_texture("assets/ui/"+current_weapon.data["hud"].split('.png')[0].split('ui/')[1]+"_nm.png")
+		var normal_map_path = "assets/ui/"+current_weapon.data["hud"].split('.png')[0].split('ui/')[1]+"_nm.png"
+		if _normal_map_exists(normal_map_path, false):
+			mat.normal_texture = Utility.load_external_texture(normal_map_path)
 			#print("found normalmap for %s" % GameManager.app_dir+"assets/ui/"+current_weapon.data["hud"].split('.png')[0].split('ui/')[1]+"_nm.png")
 		#print(GameManager.player.hud.material_override.albedo_texture.resource_path)
 		GameManager.player.hud.material_override = mat
@@ -143,8 +150,9 @@ func DrawWeapon(slot):
 		GameManager.player.hud.texture = Utility.load_external_texture(current_weapon.data["hud"])
 		var mat = GameManager.player.hud.material_override.duplicate() as StandardMaterial3D
 		mat.albedo_texture = Utility.load_external_texture(current_weapon.data["hud"])
-		if FileAccess.file_exists(GameManager.app_dir+"assets/ui/"+current_weapon.data["hud"].split('.png')[0].split('ui/')[1]+"_nm.png"):
-			mat.normal_texture = Utility.load_external_texture("assets/ui/"+current_weapon.data["hud"].split('.png')[0].split('ui/')[1]+"_nm.png")
+		var normal_map_path = "assets/ui/"+current_weapon.data["hud"].split('.png')[0].split('ui/')[1]+"_nm.png"
+		if _normal_map_exists(normal_map_path, true):
+			mat.normal_texture = Utility.load_external_texture(normal_map_path)
 			#print("found normalmap for %s" % GameManager.app_dir+"assets/ui/"+current_weapon.data["hud"].split('.png')[0].split('ui/')[1]+"_nm.png")
 		#print(GameManager.player.hud.material_override.albedo_texture.resource_path)
 		
