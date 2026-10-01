@@ -4,7 +4,7 @@ var current_lang = "en"
 var language_file
 
 func _ready():
-	var opt = Utility.read_json("assets/options.json")
+	var opt = MainMenu.read_options()
 	if "current_language" in opt:
 		current_lang = opt["current_language"]
 	else:

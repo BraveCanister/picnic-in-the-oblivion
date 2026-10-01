@@ -110,7 +110,62 @@ func _input(event):
 					MinusIndex()
 
 func opt():
-	return Utility.read_json("assets/options.json")
+	return read_options()
+
+# Shared with language startup; all other JSON keeps its existing routing.
+static func read_options():
+	var defaults = Utility.read_json("assets/options.json")
+	if not OS.has_feature("android") or not FileAccess.file_exists("user://options.json"):
+		return defaults
+	var file = FileAccess.open("user://options.json", FileAccess.READ)
+	if file == null:
+		push_warning("Cannot read user://options.json; using packaged defaults.")
+		return defaults
+	var text = file.get_as_text()
+	var read_error = file.get_error()
+	file.close()
+	var json = JSON.new()
+	if read_error != OK or json.parse(text) != OK:
+		push_warning("Cannot parse user://options.json; using packaged defaults.")
+		return defaults
+	if not _valid_android_options(json.data, defaults):
+		push_warning("Invalid options schema in user://options.json; using packaged defaults.")
+		return defaults
+	return json.data
+
+static func _valid_android_options(data, defaults) -> bool:
+	if not data is Dictionary:
+		return false
+	for key in defaults:
+		if not data.has(key):
+			return false
+		var expected = typeof(defaults[key])
+		var actual = typeof(data[key])
+		if expected in [TYPE_INT, TYPE_FLOAT]:
+			if actual not in [TYPE_INT, TYPE_FLOAT]:
+				return false
+		elif actual != expected:
+			return false
+	if not defaults["languages"].has(data["current_language"]):
+		return false
+	if not data["languages"].has(data["current_language"]):
+		return false
+	for language in data["languages"]:
+		if not defaults["languages"].has(language) or not data["languages"][language] is Dictionary:
+			return false
+		if not data["languages"][language].get("name") is String:
+			return false
+	for action in data["input_map"]:
+		if not action is Dictionary or not action.get("action_id") is String:
+			return false
+		var keys = action.get("key_code")
+		if keys is Array:
+			for key in keys:
+				if not key is String:
+					return false
+		elif not keys is String:
+			return false
+	return true
 
 func credits():
 	return Utility.read_json("assets/gameplay/credits.json")
@@ -507,12 +562,25 @@ func _on_opt_lang_pressed():
 
 # Store data to options!
 func save_to_options(data : String):
-	if data == null or data.is_empty(): return
-	if FileAccess.file_exists(GameManager.app_dir+"assets/options.json"):
-		var f = FileAccess.open(GameManager.app_dir+"assets/options.json",FileAccess.WRITE)
-		f.store_string(data)
-		f.close()
-	print("Saved to options.json")
+	if data == null or data.is_empty(): return false
+	var path = "user://options.json" if OS.has_feature("android") else GameManager.app_dir+"assets/options.json"
+	# Preserve desktop's existing-file contract; Android creates only its options file.
+	if not OS.has_feature("android") and not FileAccess.file_exists(path):
+		push_warning("Cannot save options: file does not exist at " + path)
+		return false
+	var file = FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		push_warning("Cannot save options to %s (error %s)." % [path, FileAccess.get_open_error()])
+		return false
+	file.store_string(data)
+	file.flush()
+	var write_error = file.get_error()
+	file.close()
+	if write_error != OK:
+		push_warning("Cannot save options to %s (error %s)." % [path, write_error])
+		return false
+	print("Saved to " + path)
+	return true
 
 func _on_opt_snd_pressed():
 	var master_sound = AudioServer.get_bus_index("Master")
@@ -750,6 +818,8 @@ func on_opt_any_btn_click(btn_name):
 		"opt_vsync":
 			var vsync_status = opt()["vsync"]
 			save_to_options(Utility.json_edit(opt().duplicate(),"vsync",!vsync_status))
+			if OS.has_feature("android"):
+				vsync_status = !vsync_status
 			if vsync_status:
 				DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED)
 			else:
