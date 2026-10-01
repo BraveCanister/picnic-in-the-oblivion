@@ -201,8 +201,9 @@ func _editor_ready():
 	
 const ANDROID_LOOK_THRESHOLD = 16.0 # Logical viewport units (1920 x 1080).
 const ANDROID_TAP_MSEC = 350
-var _android_touch = {}
+var _android_touches = {}
 var _android_touch_serial = 0
+var _android_look_index = -1
 
 func _android_gameplay_input_allowed() -> bool:
 	if not is_game_ready or current_level == null or player == null or Gui == null:
@@ -221,60 +222,73 @@ func _android_gameplay_input_allowed() -> bool:
 			return false
 	return true
 
-func _android_cancel_touch(serial):
+func _android_clear_touches():
+	_android_touches.clear()
+	_android_look_index = -1
+
+func _android_cancel_touch(index, serial):
 	# A GUI-consumed release still retires its contact; never erase a reused index.
-	if not _android_touch.is_empty() and _android_touch.serial == serial:
-		_android_touch.clear()
+	if _android_touches.has(index) and _android_touches[index].serial == serial:
+		_android_touches.erase(index)
+		if _android_look_index == index:
+			_android_look_index = -1
 
 func _android_observe_touch(event):
 	if not _android_gameplay_input_allowed():
-		_android_touch.clear()
-	if _android_touch.is_empty() or not (event is InputEventScreenTouch or event is InputEventScreenDrag):
+		_android_clear_touches()
+	if not (event is InputEventScreenTouch or event is InputEventScreenDrag):
 		return
-	if event.index != _android_touch.index:
+	if not _android_touches.has(event.index):
 		return
-	if event.position.distance_to(_android_touch.origin) > ANDROID_LOOK_THRESHOLD:
-		_android_touch.drag = true
+	var contact = _android_touches[event.index]
+	if event.position.distance_to(contact.origin) > ANDROID_LOOK_THRESHOLD:
+		contact.drag = true
+		if _android_look_index != -1 and _android_look_index != event.index:
+			contact.look_blocked = true
 	if event is InputEventScreenTouch:
 		if event.pressed or event.canceled:
-			_android_touch.clear()
+			_android_cancel_touch(event.index, contact.serial)
 		else:
-			call_deferred("_android_cancel_touch", _android_touch.serial)
+			call_deferred("_android_cancel_touch", event.index, contact.serial)
 
 func _unhandled_input(event):
 	if not OS.has_feature("android"):
 		return
 	if not _android_gameplay_input_allowed():
-		_android_touch.clear()
+		_android_clear_touches()
 		return
 	if event is InputEventScreenTouch:
 		if event.pressed:
-			if not _android_touch.is_empty():
+			if event.canceled:
 				return
 			_android_touch_serial += 1
-			_android_touch = {"index": event.index, "origin": event.position,
+			_android_touches[event.index] = {"index": event.index, "origin": event.position,
 				"started": Time.get_ticks_msec(), "drag": false, "serial": _android_touch_serial,
-				"double_tap": event.double_tap}
-		elif not _android_touch.is_empty() and event.index == _android_touch.index:
-			var tap = not event.canceled and not _android_touch.drag and \
-				event.position.distance_to(_android_touch.origin) <= ANDROID_LOOK_THRESHOLD and \
-				Time.get_ticks_msec() - _android_touch.started <= ANDROID_TAP_MSEC
-			var double_tap = _android_touch.double_tap
-			_android_touch.clear()
+				"double_tap": event.double_tap, "look_blocked": false}
+		elif _android_touches.has(event.index):
+			var contact = _android_touches[event.index]
+			var tap = not event.canceled and not contact.drag and \
+				event.position.distance_to(contact.origin) <= ANDROID_LOOK_THRESHOLD and \
+				Time.get_ticks_msec() - contact.started <= ANDROID_TAP_MSEC
+			var double_tap = contact.double_tap
+			_android_cancel_touch(event.index, contact.serial)
 			if tap and not weapon_system.is_reloading:
-				if double_tap:
-					# Preserve interaction/reload, but a second-contact drag is still look.
-					if Gui.crosshair.texture == Gui.crosshair_use_texture:
-						Input.action_press("use")
-						await get_tree().create_timer(0.1).timeout
-						Input.action_release("use")
-					else:
-						call_reload()
+				# A single qualified tap uses the existing interactable under the crosshair.
+				if Gui.crosshair.texture == Gui.crosshair_use_texture:
+					Input.action_press("use")
+					await get_tree().create_timer(0.1).timeout
+					Input.action_release("use")
+				elif double_tap:
+					call_reload()
 				else:
 					_android_fire_tap()
-	elif event is InputEventScreenDrag and not _android_touch.is_empty() and event.index == _android_touch.index:
-		if _android_touch.drag:
-			player._android_look_drag(event.relative)
+	elif event is InputEventScreenDrag and _android_touches.has(event.index):
+		var contact = _android_touches[event.index]
+		if contact.drag and not contact.look_blocked:
+			if _android_look_index == -1:
+				_android_look_index = event.index
+			if _android_look_index == event.index:
+				player._android_look_drag(event.relative)
 
 func _android_fire_tap():
 	if not _android_gameplay_input_allowed() or look_at_npc or weapon_system.is_reloading or not weapon_system.current_weapon:
@@ -488,7 +502,7 @@ func _key_pressed(action : String):
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(_delta):
 	if OS.has_feature("android") and not _android_gameplay_input_allowed():
-		_android_touch.clear()
+		_android_clear_touches()
 		if player != null:
 			player._mouse_position = Vector2.ZERO
 	
@@ -1285,7 +1299,7 @@ func _game_update(_delta):
 func weapon_actions():
 	if OS.has_feature("android"):
 		if not _android_gameplay_input_allowed():
-			_android_touch.clear()
+			_android_clear_touches()
 		# Android emulated left mouse must never fire before gesture classification.
 		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and not main_menu and _key_pressed("reload"):
 			call_reload()
