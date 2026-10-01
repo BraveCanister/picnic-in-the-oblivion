@@ -247,38 +247,52 @@ func PlaySFX(path,volume: float = -4.0):
 	var sfx = player.get_node("Head/PlayerCamera/sfx1").duplicate() as AudioStreamPlayer
 	sounds_collector.add_child(sfx)
 	sfx.volume_db = volume
-	if FileAccess.file_exists(app_dir+"assets/sounds/%s.wav" % path):
+	if AudioLoader.sound_exists(app_dir+"assets/sounds/%s.wav" % path):
 		player.PlayAudio(sfx,"assets/sounds/%s.wav" % path)
-	elif FileAccess.file_exists(app_dir+"assets/sounds/%s.mp3" % path):
+	elif AudioLoader.sound_exists(app_dir+"assets/sounds/%s.mp3" % path):
 		player.PlayAudio(sfx,"assets/sounds/%s.mp3" % path)
 	else:
 		BugTrap.Crash("Can't find sound: assets/sounds/%s" % path)
 	sfx.finished.connect(sfx.queue_free)
 
 func scan_folders(path):
+	if OS.has_feature("android") and path == "assets/sounds/":
+		var dirs = PackedStringArray()
+		for entry in ResourceLoader.list_directory(content_root + path):
+			if entry.ends_with("/"):
+				dirs.append(entry.trim_suffix("/"))
+		return dirs
 	return DirAccess.get_directories_at(app_dir+path)
+
+func scan_sound_files(path):
+	if OS.has_feature("android"):
+		var files = PackedStringArray()
+		for entry in ResourceLoader.list_directory(content_root + path):
+			if entry.ends_with(".wav") or entry.ends_with(".mp3"):
+				files.append(entry)
+		return files
+	return DirAccess.get_files_at(app_dir + path)
+
+func collect_sound_ids():
+	# Preserve root plus immediate subdirectories and the existing extensionless IDs.
+	var dirs = scan_folders("assets/sounds/")
+	var ready_to_use_sounds = []
+	for dir in range(-1, dirs.size()):
+		var prefix = "" if dir == -1 else dirs[dir] + "/"
+		for sound_file in scan_sound_files("assets/sounds/" + prefix):
+			if not sound_file.contains(".import"):
+				var sound_id = prefix + sound_file.split('.')[0]
+				if not OS.has_feature("android") or not ready_to_use_sounds.has(sound_id):
+					ready_to_use_sounds.append(sound_id)
+	return ready_to_use_sounds
 
 #region GameReady init
 # Called when the node enters the scene tree for the first time.
 func game_ready():
 	#ProjectSettings.set_setting("debug/file_logging/log_path",app_dir+"GameLog.log")
 	World = get_node("/root/Game/sv/EffectDither/World")
-	var dirs = scan_folders("assets/sounds/")
-	var sounds = []
-	var ready_to_use_sounds = []
+	var ready_to_use_sounds = collect_sound_ids()
 	var audio_loader = AudioLoader.new()
-	for dir in range(-1,dirs.size()):
-		if dir == -1:
-			sounds = DirAccess.get_files_at(app_dir+"assets/sounds/")
-			for sound_file in sounds:
-				if not sound_file.contains(".import"):
-					ready_to_use_sounds.append(sound_file.split('.')[0])
-		else:
-			sounds = DirAccess.get_files_at(app_dir+"assets/sounds/"+dirs[dir]+"/")
-			for sound_file in sounds:
-				if not sound_file.contains(".import"):
-					ready_to_use_sounds.append(dirs[dir]+"/"+sound_file.split('.')[0])
-	#print(ready_to_use_sounds)
 	
 	for snd in ready_to_use_sounds:
 		var stream = AudioStreamPlayer.new()
@@ -287,9 +301,9 @@ func game_ready():
 		else:
 			stream.name = snd
 		
-		if FileAccess.file_exists(app_dir+"assets/sounds/%s.wav" % snd):
+		if AudioLoader.sound_exists(app_dir+"assets/sounds/%s.wav" % snd):
 			stream.set_stream(audio_loader.loadfile(GameManager.app_dir+"assets/sounds/%s.wav" % snd))
-		elif FileAccess.file_exists(app_dir+"assets/sounds/%s.mp3" % snd):
+		elif AudioLoader.sound_exists(app_dir+"assets/sounds/%s.mp3" % snd):
 			stream.set_stream(audio_loader.loadfile(GameManager.app_dir+"assets/sounds/%s.mp3" % snd))			
 		else:
 			BugTrap.Crash("Can't read sound: assets/sounds/%s" % snd)

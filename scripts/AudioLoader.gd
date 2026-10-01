@@ -49,11 +49,43 @@ func report_errors(err, filepath):
 		pass
 		#print("Unknown error with file ", filepath, " error code: ", err)
 
+static func packaged_sound_path(filepath: String) -> String:
+	if OS.has_feature("android"):
+		if filepath.begins_with("res://assets/sounds/"):
+			return filepath
+		var external_root = GameManager.app_dir + "assets/sounds/"
+		if filepath.begins_with(external_root) and not FileAccess.file_exists(filepath):
+			return "res://assets/sounds/" + filepath.trim_prefix(external_root)
+	return ""
+
+static func sound_exists(filepath: String) -> bool:
+	var packaged_path = packaged_sound_path(filepath)
+	if not packaged_path.is_empty():
+		return ResourceLoader.exists(packaged_path, "AudioStream")
+	return FileAccess.file_exists(filepath)
+
 func loadfile(filepath,is_loop=false):
+	var packaged_path = packaged_sound_path(filepath)
+	if not packaged_path.is_empty():
+		var imported = ResourceLoader.load(packaged_path, "AudioStream")
+		if not (imported is AudioStreamWAV or imported is AudioStreamMP3):
+			push_error("Can't load packaged WAV/MP3 audio: " + packaged_path)
+			return null
+		# Loop settings belong to this caller, never to the cached import.
+		var stream = imported.duplicate() as AudioStream
+		if stream is AudioStreamWAV:
+			stream.loop_begin = 0
+			stream.loop_end = roundi(stream.get_length() * stream.mix_rate)
+			stream.loop_mode = AudioStreamWAV.LOOP_FORWARD if is_loop else AudioStreamWAV.LOOP_DISABLED
+		else:
+			stream.loop = is_loop
+			stream.loop_offset = 0.0
+		print("[Android audio] Loaded ", packaged_path, " loop=", is_loop)
+		return stream
+
 	var file = FileAccess.open(filepath, FileAccess.READ)
 	if file == null:
-		report_errors(file, filepath)
-		file.close()
+		report_errors(FileAccess.get_open_error(), filepath)
 		return AudioStream.new()
 
 	var bytes = file.get_buffer(file.get_length())
