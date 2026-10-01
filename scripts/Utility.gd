@@ -49,7 +49,11 @@ func set_texture_to_object(texture,two_sided=false,emission=false):
 	#new_mat.specular_mode = BaseMaterial3D.SPECULAR_TOON
 	new_mat.metallic = 0
 	new_mat.metallic_specular = 0
-	new_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
+	new_mat.shading_mode = (
+		BaseMaterial3D.SHADING_MODE_PER_PIXEL
+		if OS.has_feature("android")
+		else BaseMaterial3D.SHADING_MODE_PER_VERTEX
+	)
 	new_mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	return new_mat
 	
