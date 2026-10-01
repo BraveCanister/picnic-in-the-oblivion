@@ -363,6 +363,10 @@ func LoadPlayerProfile():
 	#GameManager.AddEventKey("dev.test.red")
 	#GameManager.Gui.DialogueWindow.StartDialogue("test_deditor","")
 ### ----------------------------------------------- ###
+func _android_look_drag(relative: Vector2):
+	if can_look:
+		_mouse_position += relative
+
 func _input(event):
 	#if not in_focus:
 	#	return
@@ -371,7 +375,7 @@ func _input(event):
 			if event is InputEventMouseMotion:
 				#print("mouse motion!")
 				_mouse_position = event.relative
-		if OS.has_feature('mobile'):
+		if OS.has_feature('mobile') and not OS.has_feature("android"):
 			if event is InputEventScreenDrag:
 				#print("touchscreen motion!")
 				#print(event.relative)
