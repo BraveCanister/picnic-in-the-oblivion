@@ -83,6 +83,14 @@ var fade_time = 1.0
 var viewport_init_size = Vector2()
 
 var last_scale = 0
+var _radio_pda_active = false
+var _radio_use_pending = false
+var _radio_started_blink = false
+var _radio_pda_texture : Texture2D
+var _normal_pda_texture : Texture2D
+var _normal_pda_visible = false
+var _normal_pda_enabled = false
+var _normal_pda_modulate : Color
 # templates of crosshair textures for quick changing
 var crosshair_gun_texture
 var crosshair_use_texture
@@ -275,6 +283,7 @@ func _process(_delta):
 		vignette.material.set_shader_parameter("vignette_opacity",opacity - _delta * 3)
 	
 	UpdateHUDAmounts()
+	_update_android_radio_pda()
 			
 	if IntroWindow.visible:
 		intro_scroll_timer -= _delta * 1
@@ -479,8 +488,70 @@ func _on_help_message_visibility_changed():
 
 
 
+func _android_radio_item() -> item:
+	if not OS.has_feature("android") or _radio_use_pending:
+		return null
+	if not GameManager.is_game_ready or GameManager.current_level == null:
+		return null
+	if not GameManager.HasQuest("quest_talk_radio") or GameManager.HasEventKey("radio.start.quest"):
+		return null
+	var player = GameManager.player
+	if GameManager.main_menu or GameManager.pause or player.is_dead or player.is_cutscene:
+		return null
+	if player.waypoint_walk or not player.can_use or not player.can_look or GameManager.weapon_system.is_reloading:
+		return null
+	if GameManager.GameProcess.cutscene_camera_movement or GameManager.GameProcess.cutscene_camera_rotation:
+		return null
+	if not frame.is_visible_in_tree():
+		return null
+	for window in [DialogueWindow, PauseWindow, MainMenuWindow, InventoryWindow, JournalWindow,
+		MapWindow, SkillWindow, TradingWindow, ConsoleWindow, SpawnMenuWindow, IntroWindow,
+		TipWindow, TradingMessage, loading_screen, final_image, death_screen]:
+		if window.visible:
+			return null
+	return InventoryWindow.Find("radio_first")
+
+func _update_android_radio_pda():
+	if not OS.has_feature("android"):
+		return
+	if _android_radio_item() != null:
+		if _radio_pda_texture == null:
+			_radio_pda_texture = ResourceLoader.load("res://assets/ui/items/hand_radio.png", "Texture2D") as Texture2D
+		if _radio_pda_texture == null:
+			return
+		if not _radio_pda_active:
+			_normal_pda_texture = pda_icon.texture
+			_normal_pda_visible = pda_icon.visible
+			_normal_pda_enabled = GameManager.pda_enabled
+			_normal_pda_modulate = pda_icon.modulate
+			_radio_started_blink = not pda_icon.get_child(0).is_playing()
+			if _radio_started_blink:
+				pda_icon.get_child(0).play("blink")
+			_radio_pda_active = true
+		pda_icon.texture = _radio_pda_texture
+		pda_icon.show()
+	elif _radio_pda_active:
+		pda_icon.texture = _normal_pda_texture
+		# Preserve a story-driven ShowPDA change made during the temporary role.
+		if GameManager.pda_enabled == _normal_pda_enabled:
+			pda_icon.visible = _normal_pda_visible
+			if _radio_started_blink:
+				pda_icon.get_child(0).stop()
+				pda_icon.modulate = _normal_pda_modulate
+		_radio_started_blink = false
+		_radio_pda_active = false
+
 func _on_pda_icon_gui_input(event):
 	if event is InputEventScreenTouch:
+		if OS.has_feature("android") and event.is_pressed():
+			# Radio must never fall through to Map while this quest is waiting.
+			if GameManager.HasQuest("quest_talk_radio") and not GameManager.HasEventKey("radio.start.quest"):
+				var radio_item = _android_radio_item()
+				if radio_item != null:
+					_radio_use_pending = true
+					await radio_item.UseItem()
+					_radio_use_pending = false
+				return
 		if event.is_pressed() and GameManager.pda_enabled:
 			GameManager.pause = true
 			MapWindow.Open()
