@@ -2084,6 +2084,7 @@ func load_level(id : String,silent=false):
 					else:
 						new_obj.material_override.set_shader_parameter("enabled",true)
 				add_screen_notifier(new_obj)
+				preload("res://scripts/mobile_receiver_partitions.gd").apply(new_obj, obj["model"])
 				level_node.add_child(new_obj)
 				editor_level_objects.append(new_obj)
 	current_level_id = id
