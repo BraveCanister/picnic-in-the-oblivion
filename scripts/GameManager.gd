@@ -201,9 +201,14 @@ func _editor_ready():
 	
 const ANDROID_LOOK_THRESHOLD = 16.0 # Logical viewport units (1920 x 1080).
 const ANDROID_TAP_MSEC = 350
+var _android_gestures = preload("res://scripts/AndroidWeaponGestures.gd").new()
 var _android_touches = {}
 var _android_touch_serial = 0
 var _android_look_index = -1
+
+func _notification(what):
+	if OS.has_feature("android") and what == NOTIFICATION_APPLICATION_FOCUS_OUT:
+		_android_clear_touches()
 
 func _android_gameplay_input_allowed() -> bool:
 	if not is_game_ready or current_level == null or player == null or Gui == null:
@@ -223,12 +228,15 @@ func _android_gameplay_input_allowed() -> bool:
 	return true
 
 func _android_clear_touches():
+	_android_gestures.end_scope(self)
+	_android_gestures.reload_motion.reset(Time.get_ticks_msec())
 	_android_touches.clear()
 	_android_look_index = -1
 
 func _android_cancel_touch(index, serial):
 	# A GUI-consumed release still retires its contact; never erase a reused index.
 	if _android_touches.has(index) and _android_touches[index].serial == serial:
+		_android_gestures.release(self, index)
 		_android_touches.erase(index)
 		if _android_look_index == index:
 			_android_look_index = -1
@@ -265,6 +273,9 @@ func _unhandled_input(event):
 			_android_touches[event.index] = {"index": event.index, "origin": event.position,
 				"started": Time.get_ticks_msec(), "drag": false, "serial": _android_touch_serial,
 				"double_tap": event.double_tap, "look_blocked": false}
+			_android_gestures.begin(self, _android_touches[event.index], event.position)
+			if _android_touches[event.index].get("gesture", false):
+				get_viewport().set_input_as_handled()
 		elif _android_touches.has(event.index):
 			var contact = _android_touches[event.index]
 			var tap = not event.canceled and not contact.drag and \
@@ -288,7 +299,8 @@ func _unhandled_input(event):
 			if _android_look_index == -1:
 				_android_look_index = event.index
 			if _android_look_index == event.index:
-				player._android_look_drag(event.relative)
+				player._android_look_drag(contact.get("look_replay", event.relative))
+				contact.erase("look_replay")
 
 func _android_fire_tap():
 	if not _android_gameplay_input_allowed() or look_at_npc or weapon_system.is_reloading or not weapon_system.current_weapon:
@@ -302,6 +314,19 @@ func _android_fire_tap():
 func _input(event):
 	if OS.has_feature("android"):
 		_android_observe_touch(event)
+		if (event is InputEventScreenTouch or event is InputEventScreenDrag) and _android_touches.has(event.index):
+			var contact = _android_touches[event.index]
+			if contact.get("gesture", false):
+				# A short stationary tap is still the existing fire/interact/reload tap.
+				var plain_tap = event is InputEventScreenTouch and not event.pressed and not event.canceled and not contact.gesture_done and not contact.drag and event.position.distance_to(contact.origin) <= ANDROID_LOOK_THRESHOLD and Time.get_ticks_msec() - contact.started <= ANDROID_TAP_MSEC
+				if plain_tap:
+					contact.gesture = false
+				else:
+					_android_gestures.update(self, contact, event)
+					if contact.get("gesture", false):
+						get_viewport().set_input_as_handled()
+						if event is InputEventScreenTouch and (not event.pressed or event.canceled):
+							_android_cancel_touch(event.index, contact.serial)
 		return
 	if OS.has_feature("mobile"):
 		if is_game_ready and current_level != null:
@@ -392,6 +417,10 @@ func collect_sound_ids():
 #region GameReady init
 # Called when the node enters the scene tree for the first time.
 func game_ready():
+	# Android touch gameplay uses root unhandled input, not viewport object picking.
+	# Finger input can leave native mouse mode VISIBLE even after capture requests.
+	if OS.has_feature("android"):
+		get_node("/root/Game/sv/EffectDither").physics_object_picking = false
 	#ProjectSettings.set_setting("debug/file_logging/log_path",app_dir+"GameLog.log")
 	World = get_node("/root/Game/sv/EffectDither/World")
 	var ready_to_use_sounds = collect_sound_ids()
@@ -501,6 +530,8 @@ func _key_pressed(action : String):
 	return Input.is_action_just_pressed(action)
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(_delta):
+	if OS.has_feature("android"):
+		_android_gestures.tick(self)
 	if OS.has_feature("android") and not _android_gameplay_input_allowed():
 		_android_clear_touches()
 		if player != null:
@@ -1283,19 +1314,23 @@ func _game_update(_delta):
 			
 		
 				
-		if Input.is_action_just_pressed("wpn1") and weapon_system.pslot:
-			if weapon_system.pslot and not weapon_system.is_reloading and player.hud_anim_player.current_animation != "shoot":
-				if weapon_system.current_weapon and weapon_system.current_weapon.id != weapon_system.pslot.id:
-					weapon_system.last_magazine_wpn[weapon_system.pslot.id] = weapon_system.pslot.ammo_mag
-					weapon_system.HideWeapon()
-					weapon_system.DrawWeapon("pistol")
-			
-		if Input.is_action_just_pressed("wpn2") and weapon_system.rslot:
-			if weapon_system.current_weapon and weapon_system.current_weapon.id != weapon_system.rslot.id and not weapon_system.is_reloading and player.hud_anim_player.current_animation != "shoot":
-				weapon_system.last_magazine_wpn[weapon_system.rslot.id] = weapon_system.rslot.ammo_mag
-				weapon_system.HideWeapon()
-				weapon_system.DrawWeapon("rifle")
-				
+		if Input.is_action_just_pressed("wpn1"):
+			_select_weapon_slot("pistol")
+		if Input.is_action_just_pressed("wpn2"):
+			_select_weapon_slot("rifle")
+
+# Shared desktop slot-selection path; no Android inventory cycling.
+func _select_weapon_slot(slot_name: String) -> bool:
+	var destination = weapon_system.pslot if slot_name == "pistol" else weapon_system.rslot
+	if not destination or not weapon_system.current_weapon or weapon_system.is_reloading:
+		return false
+	if player.hud_anim_player.current_animation == "shoot" or weapon_system.current_weapon.id == destination.id:
+		return false
+	weapon_system.last_magazine_wpn[destination.id] = destination.ammo_mag
+	weapon_system.HideWeapon()
+	weapon_system.DrawWeapon(slot_name)
+	return true
+
 func weapon_actions():
 	if OS.has_feature("android"):
 		if not _android_gameplay_input_allowed():
@@ -1325,6 +1360,8 @@ func call_reload():
 	if weapon_system.current_weapon and player.hud_anim_player.current_animation != "shoot":
 		if weapon_system.current_weapon.ammo_mag < weapon_system.current_weapon.data["clip_ammo_max"]:
 			if weapon_system.ammo_in_inv != 0 or weapon_system.infinite_ammo:
+				if OS.has_feature("android"):
+					_android_gestures.end_scope(self)
 				weapon_system.can_shoot = false
 				weapon_system.is_reloading = true
 				player.PlayHudAnimation(weapon_system.current_weapon.data["reload_anim"])
@@ -2087,6 +2124,7 @@ func load_level(id : String,silent=false):
 				preload("res://scripts/mobile_receiver_partitions.gd").apply(new_obj, obj["model"])
 				level_node.add_child(new_obj)
 				editor_level_objects.append(new_obj)
+	preload("res://scripts/mobile_receiver_partitions.gd").apply_galosh_participation(level_node,id)
 	current_level_id = id
 	
 	level_node.name = id

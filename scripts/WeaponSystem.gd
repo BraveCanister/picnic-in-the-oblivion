@@ -39,7 +39,13 @@ func CheckWeaponsInInventorySlots():
 		rslot.item_data = rifle_slot
 		
 func _get_profile(slot):
-	return GameManager.weapons_json[slot.keys["profile"]]
+	var profile = GameManager.weapons_json[slot.keys["profile"]]
+	if OS.has_feature("android") and slot.keys["profile"] == "w_vintar":
+		profile = profile.duplicate(true)
+		profile["hud_position"][0] -= 0.002
+		# Match horizontal screen displacement at the muzzle's greater depth.
+		profile["sparkle_position"][0] -= 0.002 * absf(profile["sparkle_position"][2] / profile["hud_position"][2])
+	return profile
 
 func NewWeapon(id, data, ammo, speed, damage, accuracy):
 	var wpn = Weapon.new()
@@ -185,16 +191,16 @@ func UpdateAmmo():
 	if current_weapon:
 		
 		if infinite_ammo:
-			GameManager.Gui.ammo_clip.text = str(current_weapon.ammo_mag)
-			GameManager.Gui.ammo_all.text = str(current_weapon.data["clip_ammo_max"])
+			GameManager.Gui.ammo_clip.text = _ammo_counter_text(current_weapon.ammo_mag)
+			GameManager.Gui.ammo_all.text = _ammo_counter_text(current_weapon.data["clip_ammo_max"])
 		else:
 			ammo_in_inv = 0
 			for ammo in GameManager.Gui.InventoryWindow.items_list:
 				if is_instance_valid(ammo):
 					if ammo.ID == current_weapon.data["ammo_type"]:
 						ammo_in_inv += 1
-			GameManager.Gui.ammo_clip.text = str(current_weapon.ammo_mag)
-			GameManager.Gui.ammo_all.text = str(ammo_in_inv)
+			GameManager.Gui.ammo_clip.text = _ammo_counter_text(current_weapon.ammo_mag)
+			GameManager.Gui.ammo_all.text = _ammo_counter_text(ammo_in_inv)
 	else:
 		#GameManager.Gui.crosshair.texture = GameManager.Gui.crosshair_use_texture
 		GameManager.Gui.ammo_clip.text = ""
@@ -313,3 +319,7 @@ func DeleteWeapon(slot,silent = false):
 
 func _process(delta):
 	_dt += 1 * delta
+
+func _ammo_counter_text(value) -> String:
+	# JSON ammo capacities can be floats; whole rounds must not show a clipped .0.
+	return str(int(value)) if OS.has_feature("android") else str(value)

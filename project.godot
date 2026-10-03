@@ -26,6 +26,10 @@ config/icon="res://Icon.png"
 
 [autoload]
 
+
+AndroidFullscreen="*res://scripts/AndroidFullscreen.gd"
+
+
 GameAPI="*res://scripts/GameAPI.gd"
 BugTrap="*res://scripts/BugTrap.gd"
 GameManager="*res://scripts/GameManager.gd"
@@ -289,3 +293,9 @@ lights_and_shadows/positional_shadow/atlas_quadrant_2_subdiv=1
 lights_and_shadows/positional_shadow/atlas_quadrant_3_subdiv=1
 shading/overrides/force_vertex_shading.mobile=false
 environment/screen_space_reflection/roughness_quality=0
+
+[input_devices]
+
+sensors/enable_accelerometer=true
+sensors/enable_gravity=true
+sensors/enable_gyroscope=true
