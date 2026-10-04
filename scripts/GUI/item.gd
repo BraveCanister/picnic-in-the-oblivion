@@ -621,6 +621,8 @@ func _equip_item(equipment_slot : slot):
 	#	GameManager.Gui.weapon_icon.texture = self.texture
 		
 func UseItem():
+	if ID in ["medkit", "medkit_army"] and GameManager.player.health >= GameManager.player.health_max:
+		return
 	_clear_selection_texts()
 	#var player : FreeLookCamera = GameManager.player as FreeLookCamera
 	if keys["type"] == "usable":

@@ -68,6 +68,7 @@ var sound_enabled = true
 @onready var opt_slider_fx = $Options/ScrollContainer/VerticalContainer/slider_number_fx
 @onready var opt_slider_mouse_smooth = $Options/ScrollContainer/VerticalContainer/slider_number_smooth
 @onready var opt_slider_mouse_sens = $Options/ScrollContainer/VerticalContainer/slider_number_sens
+@onready var opt_slider_fov = $Options/ScrollContainer/VerticalContainer/slider_number_fov
 @onready var opt_slider_3d_scale = $Options/ScrollContainer/VerticalContainer/slider_number_3dscale
 
 @onready var opt_ssao_btn : Button = $Options/ScrollContainer/VerticalContainer/opt_ssao
@@ -115,6 +116,7 @@ func opt():
 # Shared with language startup; all other JSON keeps its existing routing.
 static func read_options():
 	var defaults = Utility.read_json("assets/options.json")
+	_normalize_world_fov(defaults)
 	if not OS.has_feature("android") or not FileAccess.file_exists("user://options.json"):
 		return defaults
 	var file = FileAccess.open("user://options.json", FileAccess.READ)
@@ -128,10 +130,16 @@ static func read_options():
 	if read_error != OK or json.parse(text) != OK:
 		push_warning("Cannot parse user://options.json; using packaged defaults.")
 		return defaults
+	# Upgrade just this new option before the existing strict schema validation.
+	if json.data is Dictionary:
+		_normalize_world_fov(json.data)
 	if not _valid_android_options(json.data, defaults):
 		push_warning("Invalid options schema in user://options.json; using packaged defaults.")
 		return defaults
 	return json.data
+
+static func _normalize_world_fov(data: Dictionary):
+	data["world_fov"] = Player.bounded_world_fov(data.get("world_fov", Player.DEFAULT_WORLD_FOV))
 
 static func _valid_android_options(data, defaults) -> bool:
 	if not data is Dictionary:
@@ -200,7 +208,15 @@ func get_percent(value):
 #region Ready() and intitialization of options buttons
 
 func _ready():
+	if OS.has_feature("android") or OS.has_feature("mobile"):
+		opt_ssao_btn.hide()
+		opt_volumetric_fog_btn.hide()
+		_configure_options_scrollbar()
 	var _opt = opt()
+	# One increment per press, using the existing value-control layout.
+	opt_slider_fov.get_node("low_volume").pressed.connect(_change_world_fov.bind(-1.0))
+	opt_slider_fov.get_node("rise_volume").pressed.connect(_change_world_fov.bind(1.0))
+	opt_slider_fov.get_node("number").text = "%d°" % _opt["world_fov"]
 	var sliders = [opt_slider_main,
 	opt_slider_amb, opt_slider_music,
 	opt_slider_sfx, opt_slider_fx,
@@ -282,10 +298,32 @@ func _ready():
 	
 #endregion
 
+func _configure_options_scrollbar():
+	var scroll: ScrollContainer = $Options/ScrollContainer
+	# Let finger swipes starting on an option reach the native scroll handler.
+	scroll.scroll_deadzone = 12
+	for button in scroll.find_children("*", "BaseButton", true, false):
+		button.mouse_filter = Control.MOUSE_FILTER_PASS
+	var scrollbar = scroll.get_v_scroll_bar()
+	# The container reserves this column; it cannot cover option buttons.
+	scrollbar.custom_minimum_size.x = 48.0
+	var track = StyleBoxEmpty.new()
+	track.content_margin_right = 48.0
+	scrollbar.add_theme_stylebox_override("scroll", track)
+	scrollbar.add_theme_stylebox_override("scroll_focus", track)
+	for state in ["grabber", "grabber_highlight", "grabber_pressed"]:
+		var original = scrollbar.get_theme_stylebox(state) as StyleBoxFlat
+		var thumb = StyleBoxFlat.new()
+		thumb.bg_color = Color.TRANSPARENT
+		thumb.border_color = original.bg_color if original != null else Color(0.4, 0.4, 0.4)
+		thumb.border_width_right = 8
+		scrollbar.add_theme_stylebox_override(state, thumb)
+
 func OnSplashFinishedAll():
 	GameManager.player.PlayMusic("assets/sounds/mm_music.wav")
 
 func _update_options():
+	opt_slider_fov.get_node("number").text = "%d°" % opt()["world_fov"]
 	opt_lang_btn.text = Lang.translate("mm.opt.lang.selector") + " %s" % Lang.translate("lang.%s" % Lang.current_lang)
 	opt_lang_first_launch.text = Lang.translate("mm.opt.lang.selector") + " %s" % Lang.translate("lang.%s" % Lang.current_lang)
 	_set_ui_opt_text(opt_difficulty_first_launch,opt()["casual_gameplay"],"mm.opt.difficulty","mm.opt.difficulty.easy","mm.opt.difficulty.normal")
@@ -710,9 +748,18 @@ func on_volume_low_slider_clicked(btn_id):
 				get_tree().root.scaling_3d_scale -= 0.1
 				opt_slider_3d_scale.get_node("number").text = str(round(get_tree().root.scaling_3d_scale*100.0))+"%"
 
+func _change_world_fov(step: float):
+	var options = opt().duplicate(true)
+	var value = Player.bounded_world_fov(options["world_fov"] + step)
+	options["world_fov"] = value
+	if save_to_options(JSON.stringify(options)):
+		GameManager.player.SetWorldFov(value)
+		opt_slider_fov.get_node("number").text = "%d°" % value
+
 func on_game_ready():
 	var _opt_ready = opt()
 	var player : Player = GameManager.player as Player
+	player.SetWorldFov(_opt_ready["world_fov"])
 	# options load music/sound bus state
 	
 	if "music_and_sound" in _opt_ready and _opt_ready["music_and_sound"] != null:

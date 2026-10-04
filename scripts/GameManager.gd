@@ -257,6 +257,7 @@ func _android_observe_touch(event):
 		if event.pressed or event.canceled:
 			_android_cancel_touch(event.index, contact.serial)
 		else:
+			contact.released = true # Stop held fire before deferred contact cleanup.
 			call_deferred("_android_cancel_touch", event.index, contact.serial)
 
 func _unhandled_input(event):
@@ -278,7 +279,7 @@ func _unhandled_input(event):
 				get_viewport().set_input_as_handled()
 		elif _android_touches.has(event.index):
 			var contact = _android_touches[event.index]
-			var tap = not event.canceled and not contact.drag and \
+			var tap = not event.canceled and not contact.get("fire_started", false) and not contact.drag and \
 				event.position.distance_to(contact.origin) <= ANDROID_LOOK_THRESHOLD and \
 				Time.get_ticks_msec() - contact.started <= ANDROID_TAP_MSEC
 			var double_tap = contact.double_tap
@@ -302,13 +303,26 @@ func _unhandled_input(event):
 				player._android_look_drag(contact.get("look_replay", event.relative))
 				contact.erase("look_replay")
 
-func _android_fire_tap():
+func _android_fire_holds():
+	# Stationary contacts become presses after the existing tap/gesture window.
+	# Each finger owns its press; another finger can still acquire camera look.
+	for contact in _android_touches.values():
+		if contact.get("released", false) or contact.drag or contact.double_tap or contact.get("gesture_done", false):
+			continue
+		var hold_msec = _android_gestures.MAX_MSEC if contact.get("gesture", false) else ANDROID_TAP_MSEC
+		if Time.get_ticks_msec() - contact.started <= hold_msec or Gui.crosshair.texture == Gui.crosshair_use_texture:
+			continue
+		var held = contact.get("fire_started", false)
+		contact.fire_started = true
+		_android_fire_tap(held)
+
+func _android_fire_tap(held: bool = false):
 	if not _android_gameplay_input_allowed() or look_at_npc or weapon_system.is_reloading or not weapon_system.current_weapon:
 		return
-	# Use normal weapon cooldown/ammo/animation behavior, once per accepted tap.
+	# Match desktop: rifle holds repeat; pistol presses fire once.
 	if weapon_system.current_weapon == weapon_system.rslot:
 		weapon_system.Shoot()
-	elif weapon_system.current_weapon == weapon_system.pslot and weapon_system.can_shoot and player.hud_anim_player.current_animation != "shoot":
+	elif not held and weapon_system.current_weapon == weapon_system.pslot and weapon_system.can_shoot and player.hud_anim_player.current_animation != "shoot":
 		weapon_system.Shoot()
 
 func _input(event):
@@ -1335,6 +1349,8 @@ func weapon_actions():
 	if OS.has_feature("android"):
 		if not _android_gameplay_input_allowed():
 			_android_clear_touches()
+		else:
+			_android_fire_holds()
 		# Android emulated left mouse must never fire before gesture classification.
 		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED and not main_menu and _key_pressed("reload"):
 			call_reload()
@@ -1438,6 +1454,7 @@ func CompleteQuest(id:String):
 				Gui.InventoryWindow.AddItem(itm)
 				
 		quests.erase(id)
+		Gui.ShowMissionComplete()
 		emit_signal("on_quest_complete",id)
 
 func DeleteQuest(id:String):
@@ -1525,13 +1542,13 @@ func load_level_from_file(id, silent=false):
 							return
 						# if has daylight key - set light settings
 						if "daylight" in obj.keys:
-							var old_mat = player.PlayerCamera.get_node("HUD").material_override
+							var old_mat = player.hud.material_override
 							if obj.keys["daylight"]:
 								World.get_node("SceneLight").show()
 								old_mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
 								old_mat.normal_enabled = false
 								old_mat.metallic_specular = 0
-								player.PlayerCamera.get_node("HUD").material_override = old_mat
+								player.hud.material_override = old_mat
 								for mat_obj in level.get_children():
 									if mat_obj is NPC:
 										var orig_mat_0 : StandardMaterial3D = mat_obj.npc_model.get_surface_override_material(0)
@@ -1549,7 +1566,7 @@ func load_level_from_file(id, silent=false):
 								old_mat.shading_mode = StandardMaterial3D.SHADING_MODE_PER_PIXEL
 								old_mat.normal_enabled = true
 								old_mat.metallic_specular = 0
-								player.PlayerCamera.get_node("HUD").material_override = old_mat
+								player.hud.material_override = old_mat
 								for mat_obj in level.get_children():
 									if mat_obj is NPC:
 										var orig_mat_0 : StandardMaterial3D = mat_obj.npc_model.get_surface_override_material(0)
@@ -1828,19 +1845,19 @@ func load_level(id : String,silent=false):
 		outsky_color.get_material().albedo_color = Color(level_data["weather_color"])
 		
 		if "daylight" in level_data:
-			var old_mat = player.PlayerCamera.get_node("HUD").material_override
+			var old_mat = player.hud.material_override
 			if level_data["daylight"]:
 				World.get_node("SceneLight").show()
 				old_mat.shading_mode = StandardMaterial3D.SHADING_MODE_UNSHADED
 				old_mat.normal_enabled = false
 				old_mat.metallic_specular = 0
-				player.PlayerCamera.get_node("HUD").material_override = old_mat
+				player.hud.material_override = old_mat
 			else:
 				World.get_node("SceneLight").hide()
 				old_mat.shading_mode = StandardMaterial3D.SHADING_MODE_PER_PIXEL
 				old_mat.normal_enabled = true
 				old_mat.metallic_specular = 0
-				player.PlayerCamera.get_node("HUD").material_override = old_mat
+				player.hud.material_override = old_mat
 		
 		
 		if "fog" in level_data:
@@ -2120,6 +2137,8 @@ func load_level(id : String,silent=false):
 						new_obj.material_override.set_shader_parameter("enabled",false)
 					else:
 						new_obj.material_override.set_shader_parameter("enabled",true)
+				if OS.has_feature("android") and RenderingServer.get_current_rendering_method() == "gl_compatibility":
+					new_obj.material_override = preload("res://scripts/CompatibilityFlashlightMaterial.gd").wrap(new_obj.material_override, obj["model"])
 				add_screen_notifier(new_obj)
 				preload("res://scripts/mobile_receiver_partitions.gd").apply(new_obj, obj["model"])
 				level_node.add_child(new_obj)
@@ -2134,7 +2153,7 @@ func load_level(id : String,silent=false):
 		emit_signal("on_level_changed",id)	
 	_level_loaded = true
 	if OS.has_feature("android") and json_level_exists:
-		print("[World Content]: Completed JSON level "+id+"; objects="+str(level_node.get_child_count())+"; spawn="+str(player.position)+"; rotation="+str(player.rotation_degrees)+"; HUD shading="+str(player.PlayerCamera.get_node("HUD").material_override.shading_mode))
+		print("[World Content]: Completed JSON level "+id+"; objects="+str(level_node.get_child_count())+"; spawn="+str(player.position)+"; rotation="+str(player.rotation_degrees)+"; HUD shading="+str(player.hud.material_override.shading_mode))
 	if editor_mode:
 		var label_3d = preload("res://engine_objects/3d_label.tscn")
 		for obj in editor_level_objects:

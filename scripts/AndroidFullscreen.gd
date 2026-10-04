@@ -115,12 +115,36 @@ func _layout_modals(gui: Control, viewport_size: Vector2):
 			outer_frame.set_anchors_preset(Control.PRESET_TOP_LEFT)
 			outer_frame.position = -origin
 			outer_frame.size = viewport_size / outer_frame.scale
+			# Dialogue's last three texture rows are empty padding below its border.
+			var source_height = outer_frame.texture.get_height() - (3 if name == "Dialogue" else 0)
+			outer_frame.region_rect = Rect2(0, 0, outer_frame.texture.get_width(), source_height)
+			outer_frame.clip_contents = true
 			outer_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			# Background patches include opaque pixels, not just a thin line.
 			# Keep them below every content/control/bar, as in the authored scene.
 			outer_frame.draw_center = true
 			outer_frame.z_index = 0
 			modal.move_child(outer_frame, 1)
+			# Join the side and bottom strokes on the border row, leaving the
+			# final dark outline intact rather than extending past the frame.
+			for side in ["Left", "Right"]:
+				# Copy only the stroke pixel; adjacent black pixels would mask
+				# the horizontal border and leave a gap at the corner.
+				var left_inset = 1 if name == "Dialogue" else 0
+				var right_inset = 2 if name == "Dialogue" else 3
+				var edge = outer_frame.get_node_or_null("BottomEdge" + side) as TextureRect
+				if edge == null:
+					edge = TextureRect.new()
+					edge.name = "BottomEdge" + side
+					var strip = AtlasTexture.new()
+					strip.atlas = outer_frame.texture
+					var source_x = left_inset if side == "Left" else outer_frame.texture.get_width() - right_inset
+					strip.region = Rect2(source_x, 314, 1, 1)
+					edge.texture = strip
+					edge.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+					edge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+					outer_frame.add_child(edge)
+				edge.position = Vector2(left_inset if side == "Left" else outer_frame.size.x - right_inset, outer_frame.size.y - 2)
 		for bar_name in ["panel_up", "panel_down"]:
 			var bar = modal.get_node_or_null(bar_name) as NinePatchRect
 			if bar == null:
@@ -129,9 +153,15 @@ func _layout_modals(gui: Control, viewport_size: Vector2):
 				modal_bar_offsets[bar] = Vector4(bar.offset_left, bar.offset_top, bar.offset_right, bar.offset_bottom)
 			bar.anchor_left = 0.0
 			bar.anchor_right = 0.0
+			var original: Vector4 = modal_bar_offsets[bar]
 			bar.offset_left = -origin.x
 			bar.offset_right = viewport_size.x / bar.scale.x - origin.x
-			var original: Vector4 = modal_bar_offsets[bar]
+			if name in ["Dialogue", "Trading"] and bar_name == "panel_down":
+				# Preserve the authored PC insets instead of shifting both bars
+				# to the same asymmetric spacing.
+				var right_inset = design_size.x - (original.x + (original.z - original.x) * bar.scale.x)
+				bar.offset_left += original.x
+				bar.offset_right = bar.offset_left + (viewport_size.x - original.x - right_inset) / bar.scale.x
 			var vertical_shift = -origin.y if bar_name == "panel_up" else origin.y
 			bar.offset_top = original.y + vertical_shift
 			bar.offset_bottom = original.w + vertical_shift

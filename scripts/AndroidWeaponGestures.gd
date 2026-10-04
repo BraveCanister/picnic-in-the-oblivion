@@ -18,7 +18,7 @@ var reload_motion = preload("res://scripts/AndroidReloadMotion.gd").new()
 func weapon_region(manager) -> Rect2:
 	if manager.player == null or manager.weapon_system == null or not manager.weapon_system.current_weapon:
 		return Rect2()
-	var base_fov = manager.player.basic_fov if manager.weapon_system.is_scoping else -1.0
+	var base_fov = Player.DEFAULT_WORLD_FOV if manager.weapon_system.is_scoping else -1.0
 	var size = manager.get_viewport().get_visible_rect().size
 	return sprite_region(manager.player.hud, size, base_fov)
 

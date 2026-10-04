@@ -15,6 +15,7 @@
 			"name": "lang.ua"
 		}
 	},
+	"world_fov": 76,
 	"mouse_sensitivity": 0.19,
 	"mouse_smooth": 17,
 	"vsync": true,

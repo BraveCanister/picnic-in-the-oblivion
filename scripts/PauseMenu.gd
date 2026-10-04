@@ -136,6 +136,10 @@ func _process(delta):
 					if GameManager.level_is_safe:
 						GameManager.SaveGame()
 					GameManager.Gui.MapWindow.Close()
+				else:
+					# HUD Map returns directly to gameplay through the same Back action.
+					GameManager.Gui.MapWindow.Close()
+					return
 				
 			if GameManager.Gui.SkillWindow.IsOpened():
 				if GameManager.Gui.SkillWindow.is_open_from_pause:

@@ -35,7 +35,7 @@ class_name GUI
 @onready var medkit_icon : TextureRect = $GAME/frame/medkit_icon
 @onready var medkit_army_icon : TextureRect = $GAME/frame/medkit2_icon
 @onready var antirad_icon : TextureRect = $GAME/frame/antirad_icon
-@onready var weapon_hud : Sprite3D = $"../../sv/EffectDither/World/Player/Head/PlayerCamera/HUD"
+@onready var weapon_hud : Sprite3D = $"../../sv/EffectDither/World/Player/Head/PlayerCamera/WeaponPresentation/HUD"
 @onready var casual_icon = $GAME/frame/casual_icon
 @onready var press_f_text : Label = $GAME/frame/press_f
 @onready var death_screen = $DeathScreen
@@ -76,6 +76,12 @@ var message_showtime = 1.5
 @onready var message_timer = Timer.new()
 var intro_scroll_timer = 1.0
 var messages_queue = []
+var _message_tween: Tween
+var _message_layout: Array = []
+var _confirmation_accept: Callable
+var _confirmation_cancel: Callable
+var _confirmation_cancel_button: Button
+var _confirmation_layout: Dictionary = {}
 
 var splash_timer = 3.0
 var fade_time = 1.0
@@ -147,9 +153,13 @@ func _ready():
 		print("[GUI Fonts]: Packaged regular/bold FontFile copies configured and assigned.")
 	#get_tree().root.content_scale_factor = 1.5
 	message_timer.wait_time = message_showtime
+	message_timer.one_shot = true
 	message_timer.name = "message_queue_timer"
 	message_timer.timeout.connect(on_message_timer_timeout)
 	add_child(message_timer)
+	TradingMessage.visibility_changed.connect(func():
+		if not TradingMessage.visible:
+			CancelConfirmation())
 	resize_cursor()
 	get_tree().root.size_changed.connect(resize_cursor)
 	await get_tree().create_timer(0.1).timeout
@@ -191,16 +201,52 @@ func _ready():
 		antirad_icon.hide()
 
 func on_message_timer_timeout():
-	if messages_queue.size() > 0:
-		var stringToPrint = messages_queue.pop_front() # Dequeue a string
-		message.text = stringToPrint
-		if message_timer.is_stopped():
-			message_timer.start()
+	var fade: float = messages_queue[0]["fade"]
+	if fade > 0.0:
+		_message_tween = create_tween()
+		_message_tween.tween_property(message, "modulate:a", 0.0, fade)
+		_message_tween.tween_callback(_advance_message)
 	else:
-		print("String queue is empty.")
+		_advance_message()
+
+func _advance_message():
+	messages_queue.pop_front()
+	_restore_message_layout()
+	message.modulate.a = 1.0
+	if messages_queue.is_empty():
 		message.text = ""
-		# Stop the timer when the queue is empty
-		message_timer.stop()
+	else:
+		_show_queued_message()
+
+func _restore_message_layout():
+	if _message_layout.is_empty():
+		return
+	message.anchor_left = _message_layout[0]
+	message.anchor_top = _message_layout[1]
+	message.anchor_right = _message_layout[2]
+	message.anchor_bottom = _message_layout[3]
+	message.offset_left = _message_layout[4]
+	message.offset_top = _message_layout[5]
+	message.offset_right = _message_layout[6]
+	message.offset_bottom = _message_layout[7]
+	message.horizontal_alignment = _message_layout[8]
+	_message_layout.clear()
+
+func _show_queued_message():
+	var entry = messages_queue[0]
+	message.text = entry["text"]
+	if entry["top"]:
+		_message_layout = [message.anchor_left, message.anchor_top, message.anchor_right,
+			message.anchor_bottom, message.offset_left, message.offset_top,
+			message.offset_right, message.offset_bottom, message.horizontal_alignment]
+		message.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+		# The HUD frame is scaled fivefold; this label is scaled by one half.
+		message.offset_left = 8.0
+		message.offset_top = 12.0
+		message.offset_right = message.get_parent().size.x - 8.0
+		message.offset_bottom = 60.0
+		message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	message_timer.start(entry["duration"])
 	
 func resize_cursor():
 	var cursor_compressed_image : Texture2D = Utility.load_external_texture("assets/ui/cursor.png")
@@ -314,14 +360,136 @@ func PressF(state : bool):
 			press_f_text.text = "%s" % Lang.translate("press.mobile")
 	else:
 		press_f_text.text = ""
-func ShowMessage(text):
-	messages_queue.push_back(text)
+func ShowMessage(text, duration: float = 1.5, fade: float = 0.0, at_top: bool = false):
+	# Preserve the original first-message dwell for existing notifications.
+	if messages_queue.is_empty() and not at_top:
+		duration += message_showtime
+	messages_queue.push_back({"text": text, "duration": duration, "fade": fade, "top": at_top})
 	if messages_queue.size() == 1:
-		message.text = text
-		if message_timer.is_stopped():
-			message_timer.start()
+		_show_queued_message()
+
+func ShowMissionComplete():
+	ShowMessage(Lang.translate("mission.complete"), 4.5, 0.5, true)
+	var sfx = GameManager.player.get_node("Head/PlayerCamera/sfx1").duplicate() as AudioStreamPlayer
+	GameManager.player.get_node("Head/PlayerCamera/Sounds").add_child(sfx)
+	sfx.stream = preload("res://assets/sounds/pda_objective.mp3")
+	sfx.volume_db = -4.0
+	sfx.finished.connect(sfx.queue_free)
+	sfx.play()
+
+func ShowConfirmation(text: String, accept: Callable, cancel: Callable):
+	ShowTradingMessage(text)
+	# Cover AndroidBack (z=2) along with the rest of the character menu.
+	TradingMessage.z_index = 3
+	# Temporarily adapt the existing popup pieces; other messages retain their layout.
+	for node in [TradingMessage, $GAME/TradingMessage/BG2, $GAME/TradingMessage/BGBlack, $GAME/TradingMessage/panel_down, $GAME/TradingMessage/infoText]:
+		var state: Dictionary = {}
+		var properties = ["anchor_left", "anchor_top", "anchor_right", "anchor_bottom",
+			"offset_left", "offset_top", "offset_right", "offset_bottom", "scale", "pivot_offset", "visible"]
+		if node is NinePatchRect:
+			properties.append_array(["texture", "region_rect", "patch_margin_left",
+				"patch_margin_top", "patch_margin_right", "patch_margin_bottom"])
+		for property in properties:
+			state[property] = node.get(property)
+		_confirmation_layout[node] = state
+	var frame: NinePatchRect = $GAME/TradingMessage/BG2
+	frame.texture = preload("res://assets/ui/dialogue_ramka.png")
+	frame.region_rect = Rect2(0, 0, 240, 317)
+	frame.patch_margin_left = 4
+	frame.patch_margin_top = 8
+	frame.patch_margin_right = 72
+	frame.patch_margin_bottom = 2
+	frame.scale = Vector2(4, 4)
+	frame.offset_left = -400
+	frame.offset_top = -180
+	frame.offset_right = -200
+	frame.offset_bottom = -90
+	$GAME/TradingMessage/BGBlack.hide()
+	var bar: NinePatchRect = $GAME/TradingMessage/panel_down
+	bar.anchor_left = 0.5
+	bar.anchor_top = 0.5
+	bar.anchor_right = 0.5
+	bar.anchor_bottom = 0.5
+	bar.offset_left = -392
+	bar.offset_top = 60
+	bar.offset_right = -196
+	bar.offset_bottom = 88
+	bar.scale = Vector2(4, 4)
+	bar.show()
+	var info: RichTextLabel = $GAME/TradingMessage/infoText
+	info.offset_left = -360
+	info.offset_top = -88
+	info.offset_right = 360
+	info.offset_bottom = 40
+	info.text = "[center]" + text.replace("\n", "\n[font_size=12] [/font_size]\n") + "[/center]"
+	_confirmation_accept = accept
+	_confirmation_cancel = cancel
+	var ok: Button = $GAME/TradingMessage/ButtonTradingMsgOk
+	if _confirmation_cancel_button == null:
+		_confirmation_cancel_button = ok.duplicate(0) as Button
+		_confirmation_cancel_button.name = "ConfirmationCancel"
+		TradingMessage.add_child(_confirmation_cancel_button)
+		_confirmation_cancel_button.pressed.connect(CancelConfirmation)
+	for button in [ok, _confirmation_cancel_button]:
+		var background = button.get_node_or_null("ConfirmationBackground") as TextureRect
+		if background == null:
+			background = TextureRect.new()
+			background.name = "ConfirmationBackground"
+			background.texture = preload("res://assets/ui/btn2.png")
+			background.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+			# Match the existing BACK sprite and frame at fourfold source scale.
+			background.scale = Vector2(4, 4)
+			background.show_behind_parent = true
+			background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			button.add_child(background)
+		background.show()
+		background.flip_v = button == ok
+		button.add_theme_font_size_override("font_size", 18)
+		button.anchor_top = 0.5
+		button.anchor_bottom = 0.5
+		button.offset_top = 80.0
+		button.offset_bottom = 156.0
+	ok.text = Lang.translate("confirm").to_upper()
+	ok.offset_left = -360.0
+	ok.offset_right = -120.0
+	_confirmation_cancel_button.text = Lang.translate("cancel").to_upper()
+	_confirmation_cancel_button.offset_left = 120.0
+	_confirmation_cancel_button.offset_right = 360.0
+	_confirmation_cancel_button.show()
+	$GAME/TradingMessage/BG3.hide()
+	# Scale text, artwork and hit regions together around the popup's center.
+	TradingMessage.pivot_offset = TradingMessage.size / 2.0
+	TradingMessage.scale = Vector2(1.2, 1.2)
+
+func _clear_confirmation():
+	TradingMessage.z_index = 0
+	for node in _confirmation_layout:
+		for property in _confirmation_layout[node]:
+			node.set(property, _confirmation_layout[node][property])
+	_confirmation_layout.clear()
+	_confirmation_accept = Callable()
+	_confirmation_cancel = Callable()
+	_confirmation_cancel_button.hide()
+	$GAME/TradingMessage/ButtonTradingMsgOk/ConfirmationBackground.hide()
+	$GAME/TradingMessage/ButtonTradingMsgOk.text = "OK"
+	$GAME/TradingMessage/ButtonTradingMsgOk.add_theme_font_size_override("font_size", 28)
+	$GAME/TradingMessage/ButtonTradingMsgOk.anchor_top = 1.0
+	$GAME/TradingMessage/ButtonTradingMsgOk.anchor_bottom = 1.0
+	$GAME/TradingMessage/ButtonTradingMsgOk.offset_left = -416.0
+	$GAME/TradingMessage/ButtonTradingMsgOk.offset_top = -344.0
+	$GAME/TradingMessage/ButtonTradingMsgOk.offset_bottom = -265.0
+	$GAME/TradingMessage/ButtonTradingMsgOk.offset_right = 416.0
+	TradingMessage.hide()
+
+func CancelConfirmation():
+	if not _confirmation_cancel.is_valid():
+		return
+	var cancel = _confirmation_cancel
+	_clear_confirmation()
+	cancel.call()
 
 func ShowTradingMessage(text,type = "classic"):
+	CancelConfirmation()
 	match type:
 		"classic":
 			$GAME/TradingMessage/BG2.show()
@@ -470,6 +638,11 @@ func _on_button_intro_ok_pressed():
 
 
 func _on_button_trading_msg_ok_pressed():
+	if _confirmation_accept.is_valid():
+		var accept = _confirmation_accept
+		_clear_confirmation()
+		accept.call()
+		return
 	TradingMessage.hide()
 	GameManager.on_trading_message_ok.emit()
 	GameManager.PlaySFXLoaded(GameManager.sfx_manager_json["on_msg_btn_click"])

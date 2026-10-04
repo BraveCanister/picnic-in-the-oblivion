@@ -1,4 +1,4 @@
-[gd_scene load_steps=167 format=3 uid="uid://blnyqqwqrfcwc"]
+[gd_scene load_steps=168 format=3 uid="uid://blnyqqwqrfcwc"]
 
 [ext_resource type="Script" path="res://scripts/game.gd" id="1_2g772"]
 [ext_resource type="Environment" uid="uid://bxrhdq577f50p" path="res://themes/game_environment.tres" id="2_l0pwf"]
@@ -102,6 +102,8 @@
 [ext_resource type="Script" path="res://scripts/AmbientSystem.gd" id="95_2i6vk"]
 [ext_resource type="Texture2D" uid="uid://jjai0x13bunj" path="res://assets/models/anim/tex/pstalker.png" id="95_d1lcm"]
 [ext_resource type="Texture2D" uid="uid://duydcv4jm0gld" path="res://assets/textures/pshadow.png" id="97_kvy1j"]
+
+[ext_resource type="Script" path="res://scripts/CompatibilityFlashlight.gd" id="flashlight_compat"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_paqvg"]
 shader = ExtResource("4_g1khw")
@@ -546,7 +548,7 @@ tracks/2/keys = {
 tracks/3/type = "method"
 tracks/3/imported = false
 tracks/3/enabled = true
-tracks/3/path = NodePath("../../..")
+tracks/3/path = NodePath("../../../..")
 tracks/3/interp = 1
 tracks/3/loop_wrap = true
 tracks/3/keys = {
@@ -5786,6 +5788,82 @@ theme_override_styles/disabled = SubResource("StyleBoxEmpty_uwk1o")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_uwk1o")
 text = ">"
 
+[node name="opt_fov" type="Button" parent="CanvasLayer/GUI/GAME/MainMenu/Options/ScrollContainer/VerticalContainer"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+theme = ExtResource("11_hbbdk")
+theme_override_colors/font_color = Color(0.933333, 0.615686, 0.192157, 1)
+theme_override_colors/font_pressed_color = Color(0.933333, 0.615686, 0.192157, 1)
+theme_override_colors/font_hover_color = Color(0.933333, 0.615686, 0.192157, 1)
+theme_override_colors/font_focus_color = Color(0.933333, 0.615686, 0.192157, 1)
+theme_override_colors/font_hover_pressed_color = Color(0.933333, 0.615686, 0.192157, 1)
+theme_override_colors/font_disabled_color = Color(0.933333, 0.615686, 0.192157, 1)
+theme_override_font_sizes/font_size = 32
+theme_override_styles/normal = SubResource("StyleBoxEmpty_ubxnn")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_ubxnn")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_ubxnn")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_ubxnn")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_ubxnn")
+text = "mm.opt.world.fov"
+expand_icon = true
+script = ExtResource("26_xrg7v")
+show_anim_icon = false
+
+[node name="AnimIcon" type="AnimatedSprite2D" parent="CanvasLayer/GUI/GAME/MainMenu/Options/ScrollContainer/VerticalContainer/opt_fov"]
+visible = false
+position = Vector2(-29.5, 22)
+scale = Vector2(3, 3)
+sprite_frames = SubResource("SpriteFrames_5msjn")
+frame_progress = 0.543385
+speed_scale = 1.5
+
+[node name="slider_number_fov" type="HBoxContainer" parent="CanvasLayer/GUI/GAME/MainMenu/Options/ScrollContainer/VerticalContainer"]
+layout_mode = 2
+theme_override_constants/separation = 64
+alignment = 1
+
+[node name="low_volume" type="Button" parent="CanvasLayer/GUI/GAME/MainMenu/Options/ScrollContainer/VerticalContainer/slider_number_fov"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+size_flags_vertical = 0
+theme = ExtResource("13_jcqcl")
+theme_override_colors/font_color = Color(0.933333, 0.615686, 0.192157, 1)
+theme_override_font_sizes/font_size = 32
+theme_override_styles/normal = SubResource("StyleBoxEmpty_uwk1o")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_uwk1o")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_uwk1o")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_uwk1o")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_uwk1o")
+text = "<"
+
+[node name="number" type="Label" parent="CanvasLayer/GUI/GAME/MainMenu/Options/ScrollContainer/VerticalContainer/slider_number_fov"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+size_flags_vertical = 0
+theme = ExtResource("13_jcqcl")
+theme_override_colors/font_color = Color(0.933333, 0.615686, 0.192157, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 1)
+theme_override_constants/shadow_offset_x = 4
+theme_override_constants/shadow_offset_y = 4
+theme_override_font_sizes/font_size = 32
+text = "76°"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="rise_volume" type="Button" parent="CanvasLayer/GUI/GAME/MainMenu/Options/ScrollContainer/VerticalContainer/slider_number_fov"]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+size_flags_vertical = 0
+theme = ExtResource("13_jcqcl")
+theme_override_colors/font_color = Color(0.933333, 0.615686, 0.192157, 1)
+theme_override_font_sizes/font_size = 32
+theme_override_styles/normal = SubResource("StyleBoxEmpty_uwk1o")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_uwk1o")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_uwk1o")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_uwk1o")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_uwk1o")
+text = ">"
+
 [node name="opt_volume_main" type="Button" parent="CanvasLayer/GUI/GAME/MainMenu/Options/ScrollContainer/VerticalContainer"]
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
@@ -7706,13 +7784,13 @@ PlayerCamera = NodePath("Head/PlayerCamera")
 PlayerHead = NodePath("Head")
 FakeHead = NodePath("Head/fake_head")
 footsteps = Array[AudioStreamWAV]([ExtResource("63_g2u61"), ExtResource("64_xko2i"), ExtResource("65_7rjyx"), ExtResource("66_l8wb4")])
-WeaponHUD = NodePath("Head/PlayerCamera/HUD")
+WeaponHUD = NodePath("Head/PlayerCamera/WeaponPresentation/HUD")
 recoil_pos_curves = Array[Curve]([SubResource("Curve_trefu"), SubResource("Curve_gun3h"), SubResource("Curve_1mgg8")])
 recoil_rot_curves = Array[Curve]([SubResource("Curve_c3k2n"), SubResource("Curve_sds4g"), SubResource("Curve_0523c")])
 raycast = NodePath("Head/PlayerCamera/raycast")
-hud = NodePath("Head/PlayerCamera/HUD")
+hud = NodePath("Head/PlayerCamera/WeaponPresentation/HUD")
 timer = NodePath("Head/PlayerCamera/Timer")
-shoot_fire = NodePath("Head/PlayerCamera/WM")
+shoot_fire = NodePath("Head/PlayerCamera/WeaponPresentation/WM")
 
 [node name="Head" type="Node3D" parent="sv/EffectDither/World/Player"]
 
@@ -7722,7 +7800,9 @@ current = true
 fov = 72.0
 far = 500.0
 
-[node name="WM" type="Sprite3D" parent="sv/EffectDither/World/Player/Head/PlayerCamera"]
+[node name="WeaponPresentation" type="Node3D" parent="sv/EffectDither/World/Player/Head/PlayerCamera"]
+
+[node name="WM" type="Sprite3D" parent="sv/EffectDither/World/Player/Head/PlayerCamera/WeaponPresentation"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.052, -0.015, -0.109)
 visible = false
 layers = 2
@@ -7730,7 +7810,7 @@ pixel_size = 0.0007
 texture_filter = 0
 texture = ExtResource("50_nnh2s")
 
-[node name="HUD" type="Sprite3D" parent="sv/EffectDither/World/Player/Head/PlayerCamera"]
+[node name="HUD" type="Sprite3D" parent="sv/EffectDither/World/Player/Head/PlayerCamera/WeaponPresentation"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.003, -0.054)
 layers = 2
 material_override = SubResource("StandardMaterial3D_tspko")
@@ -7742,14 +7822,14 @@ shaded = true
 texture_filter = 0
 texture = ExtResource("63_g6ddw")
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="sv/EffectDither/World/Player/Head/PlayerCamera/HUD"]
+[node name="AnimationPlayer" type="AnimationPlayer" parent="sv/EffectDither/World/Player/Head/PlayerCamera/WeaponPresentation/HUD"]
 libraries = {
 "": SubResource("AnimationLibrary_shp27")
 }
 autoplay = "wpn_idle"
 speed_scale = 0.4
 
-[node name="HudLight" type="OmniLight3D" parent="sv/EffectDither/World/Player/Head/PlayerCamera/HUD"]
+[node name="HudLight" type="OmniLight3D" parent="sv/EffectDither/World/Player/Head/PlayerCamera/WeaponPresentation/HUD"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0119024, -0.00579183, -0.0469977)
 visible = false
 light_color = Color(0.796078, 0.796078, 0.796078, 1)
@@ -7776,6 +7856,8 @@ shadow_opacity = 0.0
 shadow_blur = 0.0
 spot_range = 15.0
 spot_angle = 35.0
+
+script = ExtResource("flashlight_compat")
 
 [node name="raycast" type="RayCast3D" parent="sv/EffectDither/World/Player/Head/PlayerCamera"]
 transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0, 0)
@@ -8038,6 +8120,6 @@ bus = &"AMBIENT_SFX"
 [connection signal="mouse_entered" from="CanvasLayer/GUI/DeathScreen/press_enter_title" to="CanvasLayer/GUI/DeathScreen" method="_on_press_enter_title_mouse_entered"]
 [connection signal="mouse_exited" from="CanvasLayer/GUI/DeathScreen/press_enter_title" to="CanvasLayer/GUI/DeathScreen" method="_on_press_enter_title_mouse_exited"]
 [connection signal="ready" from="sv/EffectDither/World/Player" to="sv/EffectDither/World/Player" method="_on_ready"]
-[connection signal="animation_finished" from="sv/EffectDither/World/Player/Head/PlayerCamera/HUD/AnimationPlayer" to="sv/EffectDither/World/Player" method="_on_animation_player_animation_finished"]
+[connection signal="animation_finished" from="sv/EffectDither/World/Player/Head/PlayerCamera/WeaponPresentation/HUD/AnimationPlayer" to="sv/EffectDither/World/Player" method="_on_animation_player_animation_finished"]
 [connection signal="area_entered" from="sv/EffectDither/World/Player/TriggerBody" to="sv/EffectDither/World/Player" method="_on_trigger_body_area_entered"]
 [connection signal="area_exited" from="sv/EffectDither/World/Player/TriggerBody" to="sv/EffectDither/World/Player" method="_on_trigger_body_area_exited"]

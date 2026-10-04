@@ -31,6 +31,9 @@ func StartDialogue(id:String, talker_name : String = "",first_replic_id = ""):
 	Open()
 
 func _ready():
+	if OS.has_feature("android"):
+		# Match Help's leading, only on the NPC speech label.
+		npc_text.add_theme_constant_override("line_separation", 8)
 	var t = GameManager.Wait(0.1) as Timer
 	await t.timeout
 	t.queue_free()

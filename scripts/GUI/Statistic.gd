@@ -13,6 +13,7 @@ class_name SkillSystem
 @export var ui_anomaly_data : Label
 @export var ui_str_data : Label
 var is_open_from_pause = false
+var _pending_skill: String = ""
 
 var level: int = 1
 var level_max : int = 10
@@ -43,6 +44,26 @@ func _ready():
 	#FixLostArtifactEffects("af_battery")
 
 func UpgradeSkill(skill:String):
+	if _pending_skill != "" or skill_point <= 0 or not is_visible_in_tree():
+		return
+	if skill not in ["armor", "accuracy", "resistance", "health", "strenght"]:
+		return
+	if GameManager.Gui.TradingMessage.visible:
+		return
+	_pending_skill = skill
+	var skill_name = Lang.translate("inv.itm.stat.armor" if skill == "armor" else "pause.skills." + skill)
+	GameManager.Gui.ShowConfirmation(
+		Lang.translate("skills.confirm") % ("[font_size=32][color=ee9d31]" + skill_name.to_upper() + "[/color][/font_size]"),
+		_confirm_skill, _cancel_skill)
+
+func _cancel_skill():
+	_pending_skill = ""
+
+func _confirm_skill():
+	var skill = _pending_skill
+	_pending_skill = ""
+	if skill == "" or not is_visible_in_tree() or skill_point <= 0:
+		return
 	GameManager.PlaySFXLoaded(GameManager.sfx_manager_json["on_skill_click"])
 	if skill_point > 0:
 		match skill:
@@ -155,6 +176,8 @@ func IsOpened():
 		return false
 
 func Close():
+	if _pending_skill != "":
+		GameManager.Gui.CancelConfirmation()
 	for skill_btn in $VerticalContainerSkills.get_children():
 		if skill_btn is UI_TEXT:
 			skill_btn.SetIconAnimation(false)
@@ -173,7 +196,8 @@ func Close():
 		GameManager.SaveGame()
 
 func _on_visibility_changed():
-	pass
+	if not is_visible_in_tree() and _pending_skill != "":
+		GameManager.Gui.CancelConfirmation()
 
 
 func _on_accuracy_pressed():

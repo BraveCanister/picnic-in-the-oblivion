@@ -21,7 +21,7 @@ const ALT_MULTIPLIER = 1.0 / SHIFT_MULTIPLIER
 # show/not show debug info on hud
 @export var debug_info = false
 # node of weapon shot sparkle
-@onready var WeaponWM : Sprite3D = $Head/PlayerCamera/WM
+@onready var WeaponWM : Sprite3D = $Head/PlayerCamera/WeaponPresentation/WM
 
 #dev test, one hit one kill
 var one_hit_kill = false
@@ -139,15 +139,18 @@ var radiation : bool = false
 var radiation_timer = 5.0
 # if *antirad* is true, this timer starts to tick
 var antirad_timer = 20.0
-# fov of the game, basicaly it's don't affects the hud, so don't change it
-var fov = 76
-var basic_fov = 1
+const DEFAULT_WORLD_FOV = 76.0
+const MIN_WORLD_FOV = 60.0
+const MAX_WORLD_FOV = 90.0
+var fov = DEFAULT_WORLD_FOV
+var basic_fov = DEFAULT_WORLD_FOV
+@onready var weapon_presentation: Node3D = $Head/PlayerCamera/WeaponPresentation
 # raycast node of player
 @export var raycast : RayCast3D
 @export var hud : Sprite3D
 @export var timer : Timer
 @export var shoot_fire : Sprite3D
-@onready var hud_anim_player : AnimationPlayer = $Head/PlayerCamera/HUD/AnimationPlayer
+@onready var hud_anim_player : AnimationPlayer = $Head/PlayerCamera/WeaponPresentation/HUD/AnimationPlayer
 # AUDIO
 @onready var audio : AudioStreamPlayer = $Head/PlayerCamera/sfx1
 @onready var audio_sfx : AudioStreamPlayer = $Head/PlayerCamera/sfx2
@@ -168,6 +171,7 @@ var rotation_range_y = [-60, 60]
 func game_init():
 	if not debug_info:
 		GameManager.Gui.timers_text.text = ""
+	fov = MainMenu.read_options().get("world_fov", DEFAULT_WORLD_FOV)
 	basic_fov = fov
 	add_to_group("player")
 	get_node("/root/Game").call_deferred_thread_group("main_game_init")
@@ -693,9 +697,24 @@ func _update_movement(delta):
 		translate(_velocity * delta * speed_multi)
 		#GameManager.effect_cam.translate(_velocity * delta * speed_multi)
 
+static func bounded_world_fov(value) -> float:
+	if typeof(value) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(value)):
+		return DEFAULT_WORLD_FOV
+	return clampf(float(value), MIN_WORLD_FOV, MAX_WORLD_FOV)
+
+func SetWorldFov(value):
+	fov = bounded_world_fov(value)
+	basic_fov = fov
+	if GameManager.weapon_system == null or not GameManager.weapon_system.is_scoping:
+		ChangeFov(basic_fov)
+
 func ChangeFov(f):
 	PlayerCamera.fov = f
-	#GameManager.effect_cam.fov = f
+	# Scope retains its original 25-degree weapon projection. Only the normal
+	# world view is compensated; sprite-local animation/recoil coordinates stay intact.
+	var reference_fov = 25.0 if GameManager.weapon_system != null and GameManager.weapon_system.is_scoping else DEFAULT_WORLD_FOV
+	var ratio = tan(deg_to_rad(float(f) * 0.5)) / tan(deg_to_rad(reference_fov * 0.5))
+	weapon_presentation.scale = Vector3(ratio, ratio, 1.0)
 
 func ChangePosition(pos : Vector3):
 	self.position = pos

@@ -256,7 +256,7 @@ screenshot={
 occlusion_culling/bvh_build_quality=0
 textures/canvas_textures/default_texture_filter=3
 gl_compatibility/driver.windows="opengl3_angle"
-renderer/rendering_method.mobile="mobile"
+renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
 textures/lossless_compression/force_png=true
 lights_and_shadows/directional_shadow/size=256
@@ -299,3 +299,22 @@ environment/screen_space_reflection/roughness_quality=0
 sensors/enable_accelerometer=true
 sensors/enable_gravity=true
 sensors/enable_gyroscope=true
+
+[shader_globals]
+
+picnic_flashlight_inverse={
+"type": "transform",
+"value": Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+}
+picnic_flashlight_tangent={
+"type": "float",
+"value": 0.7002075
+}
+picnic_flashlight_size={
+"type": "float",
+"value": 1.0
+}
+picnic_flashlight_cookie={
+"type": "sampler2D",
+"value": "res://assets/textures/flashlight.png"
+}
