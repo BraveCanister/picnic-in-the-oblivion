@@ -1,3 +1,15 @@
+## Frozen Android Compatibility source release
+
+This is an unofficial Android-focused fork of [Picnic in the Oblivion by Lekksii](https://github.com/Lekksii/picnic-in-the-oblivion).
+
+The frozen `android-compatibility` branch and `android-compatibility-2026-10-04` tag preserve source commit **6516757d41739c7714759d7f2d163a553fa27ed3**. This snapshot uses **Godot 4.7.2 stable**, the **Compatibility renderer** and **x86_64 support** for emulator/BlueStacks compatibility. It is a source-only release; no APK is attached.
+
+The default `android-port` branch adds public documentation to that same game source. See [Android port details](ANDROID_PORT.md) and [attribution and ownership notice](NOTICE.md).
+
+This is a one-time publication. Later local development is not automatically synchronized with this repository. The Mobile/Vulkan phone configuration is separate from this Compatibility snapshot.
+
+---
+
 # Picnic in the Oblivion
 This is a remake of the original mobile java game S.T.A.L.K.E.R. Mobile 3D ([phone trailer](https://www.youtube.com/watch?v=UcOBQ29YEO4)) 2007 year developed by QPlaze.
 
